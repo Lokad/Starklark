@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Lokad.Parsing;
 using Lokad.Parsing.Error;
@@ -39,37 +40,97 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     [Rule]
     public ModuleRoot Root([L] StatementLine[] lines, [T(Token.EoS)] Token eos)
     {
-        var statements = lines
-            .Select(line => line.Statement)
-            .Where(statement => statement != null)
-            .Select(statement => statement!)
-            .ToArray();
-
-        return new ModuleRoot(new StarlarkModule(statements));
+        return new ModuleRoot(new StarlarkModule(CollectStatements(lines)));
     }
 
     [Rule]
-    public StatementLine StatementLine([NTO] Statement? statement, [T(Token.EoL)] Token eol)
+    public StatementLine BlankLine([T(Token.EoL)] Token eol)
     {
-        return new StatementLine(statement);
+        return new StatementLine(null);
     }
 
     [Rule]
-    public Statement Assignment(
+    public StatementLine SimpleStatementLine([NT] SimpleStatement statement, [T(Token.EoL)] Token eol)
+    {
+        return new StatementLine(statement.Statement);
+    }
+
+    [Rule]
+    public StatementLine CompoundStatementLine([NT] CompoundStatement statement, [O(Token.EoL)] Token? eol)
+    {
+        return new StatementLine(statement.Statement);
+    }
+
+    [Rule]
+    public SimpleStatement Assignment(
         [T(Token.Id)] string name,
         [T(Token.Assign)] Token assign,
         [NT] Expression value)
     {
-        return new AssignmentStatement(name, value);
+        return new SimpleStatement(new AssignmentStatement(name, value));
     }
 
     [Rule]
-    public Statement ExpressionStatement([NT] Expression expression)
+    public SimpleStatement ExpressionStatement([NT] Expression expression)
     {
-        return new ExpressionStatement(expression);
+        return new SimpleStatement(new ExpressionStatement(expression));
+    }
+
+    [Rule]
+    public CompoundStatement IfStatement(
+        [T(Token.If)] Token keyword,
+        [NT] Expression condition,
+        [T(Token.Colon)] Token colon,
+        [NT] Suite thenSuite,
+        [NTO] ElseClause? elseClause)
+    {
+        var elseStatements = elseClause?.Statements ?? Array.Empty<Statement>();
+        return new CompoundStatement(new IfStatement(condition, thenSuite.Statements, elseStatements));
+    }
+
+    [Rule]
+    public ElseClause ElseClause(
+        [T(Token.Else)] Token keyword,
+        [T(Token.Colon)] Token colon,
+        [NT] Suite suite)
+    {
+        return new ElseClause(suite.Statements);
+    }
+
+    [Rule]
+    public Suite SingleLineSuite([NT] SimpleStatement statement)
+    {
+        return new Suite(new[] { statement.Statement });
+    }
+
+    [Rule]
+    public Suite BlockSuite(
+        [T(Token.EoL)] Token eol,
+        [T(Token.Indent)] Token indent,
+        [L] StatementLine[] lines,
+        [T(Token.Dedent)] Token dedent)
+    {
+        return new Suite(CollectStatements(lines));
+    }
+
+    private static Statement[] CollectStatements(StatementLine[] lines)
+    {
+        return lines
+            .Select(line => line.Statement)
+            .Where(statement => statement != null)
+            .Select(statement => statement!)
+            .ToArray();
     }
 }
 
 public readonly record struct ModuleRoot(StarlarkModule Module);
 
 public readonly record struct StatementLine(Statement? Statement);
+
+public readonly record struct Suite(IReadOnlyList<Statement> Statements);
+
+public readonly record struct ElseClause(IReadOnlyList<Statement> Statements);
+
+public readonly record struct SimpleStatement(Statement Statement);
+
+public readonly record struct CompoundStatement(Statement Statement);

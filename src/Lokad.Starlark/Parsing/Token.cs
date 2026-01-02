@@ -13,6 +13,8 @@ public enum Token
     [Error] Error,
     [End] EoS,
     [EndOfLine] EoL,
+    [Indent] Indent,
+    [Dedent] Dedent,
 
     [Any("and"), F(Id, true)] And,
     [Any("or"), F(Id, true)] Or,
@@ -31,9 +33,13 @@ public enum Token
     [Any("(")] OpenParen,
     [Any(")")] CloseParen,
     [Any(",")] Comma,
+    [Any(":")] Colon,
 
     [Pattern("[A-Za-z_][A-Za-z0-9_]*")]
     Id,
+
+    [Any("if"), F(Id, true)] If,
+    [Any("else"), F(Id, true)] Else,
 
     [Pattern("[0-9]+(\\.[0-9]+)?", Start = "0123456789")]
     Number,

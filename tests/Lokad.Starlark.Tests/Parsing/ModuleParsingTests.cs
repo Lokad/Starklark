@@ -31,4 +31,28 @@ public sealed class ModuleParsingTests
                 new LiteralExpression(2L)),
             expressionStatement.Expression);
     }
+
+    [Fact]
+    public void ParsesInlineIfStatement()
+    {
+        var module = StarlarkModuleParser.ParseModule("if True: x = 1\n");
+
+        var statement = Assert.Single(module.Statements);
+        var ifStatement = Assert.IsType<IfStatement>(statement);
+        Assert.Equal(new LiteralExpression(true), ifStatement.Condition);
+        Assert.Single(ifStatement.ThenStatements);
+        Assert.Empty(ifStatement.ElseStatements);
+    }
+
+    [Fact]
+    public void ParsesIndentedIfStatement()
+    {
+        var module = StarlarkModuleParser.ParseModule("if True:\n  x = 1\n");
+
+        var statement = Assert.Single(module.Statements);
+        var ifStatement = Assert.IsType<IfStatement>(statement);
+        Assert.Equal(new LiteralExpression(true), ifStatement.Condition);
+        Assert.Single(ifStatement.ThenStatements);
+        Assert.Empty(ifStatement.ElseStatements);
+    }
 }

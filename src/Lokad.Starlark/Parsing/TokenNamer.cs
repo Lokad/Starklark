@@ -15,6 +15,8 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.Error => "error",
             Token.EoS => "end-of-script",
             Token.EoL => "end-of-line",
+            Token.Indent => "indent",
+            Token.Dedent => "dedent",
             Token.Id => "identifier",
             Token.Number => "number",
             Token.String => "string",
@@ -23,6 +25,8 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.And => "'and'",
             Token.Or => "'or'",
             Token.Not => "'not'",
+            Token.If => "'if'",
+            Token.Else => "'else'",
             Token.Equal => "'=='",
             Token.NotEqual => "'!='",
             Token.Assign => "'='",
@@ -33,6 +37,7 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.OpenParen => "'('",
             Token.CloseParen => "')'",
             Token.Comma => "','",
+            Token.Colon => "':'",
             _ => token.ToString()
         };
     }

@@ -150,6 +150,11 @@ public class TAttribute : TerminalAttribute
     public TAttribute(params Token[] read) : base(read.Select(t => (int)t)) { }
 }
 
+public class OAttribute : TerminalAttribute
+{
+    public OAttribute(params Token[] read) : base(read.Select(t => (int)t), true) { }
+}
+
 public class LAttribute : ListAttribute
 {
     public LAttribute(int maxRank = -1) : base(maxRank) { }

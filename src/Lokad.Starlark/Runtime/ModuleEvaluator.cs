@@ -8,9 +8,14 @@ public sealed class ModuleEvaluator
 
     public StarlarkValue? ExecuteModule(StarlarkModule module, StarlarkEnvironment environment)
     {
+        return ExecuteStatements(module.Statements, environment);
+    }
+
+    private StarlarkValue? ExecuteStatements(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
+    {
         StarlarkValue? lastValue = null;
 
-        foreach (var statement in module.Statements)
+        foreach (var statement in statements)
         {
             switch (statement)
             {
@@ -21,6 +26,13 @@ public sealed class ModuleEvaluator
                     break;
                 case ExpressionStatement expressionStatement:
                     lastValue = _expressionEvaluator.Evaluate(expressionStatement.Expression, environment);
+                    break;
+                case IfStatement ifStatement:
+                    var condition = _expressionEvaluator.Evaluate(ifStatement.Condition, environment);
+                    var branch = condition.IsTruthy
+                        ? ifStatement.ThenStatements
+                        : ifStatement.ElseStatements;
+                    lastValue = ExecuteStatements(branch, environment);
                     break;
                 default:
                     throw new InvalidOperationException(
