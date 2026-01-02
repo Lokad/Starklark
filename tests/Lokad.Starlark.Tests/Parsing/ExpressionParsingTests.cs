@@ -105,4 +105,13 @@ public sealed class ExpressionParsingTests
         Assert.Equal(new IdentifierExpression("items"), index.Target);
         Assert.Equal(new LiteralExpression(0L), index.Index);
     }
+
+    [Fact]
+    public void ParsesInExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("1 in [1, 2]");
+
+        var binary = Assert.IsType<BinaryExpression>(expr);
+        Assert.Equal(BinaryOperator.In, binary.Operator);
+    }
 }

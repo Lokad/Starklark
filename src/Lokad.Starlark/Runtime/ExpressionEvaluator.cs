@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Lokad.Starlark.Syntax;
 
 namespace Lokad.Starlark.Runtime;
@@ -95,6 +98,7 @@ public sealed class ExpressionEvaluator
             BinaryOperator.Divide => Divide(leftValue, rightValue),
             BinaryOperator.Equal => new StarlarkBool(Equals(leftValue, rightValue)),
             BinaryOperator.NotEqual => new StarlarkBool(!Equals(leftValue, rightValue)),
+            BinaryOperator.In => new StarlarkBool(IsIn(leftValue, rightValue)),
             _ => throw new ArgumentOutOfRangeException(nameof(binary.Operator), binary.Operator, null)
         };
     }
@@ -223,6 +227,33 @@ public sealed class ExpressionEvaluator
         }
 
         return resolved;
+    }
+
+    private static bool IsIn(StarlarkValue item, StarlarkValue container)
+    {
+        return container switch
+        {
+            StarlarkList list => ContainsValue(list.Items, item),
+            StarlarkTuple tuple => ContainsValue(tuple.Items, item),
+            StarlarkDict dict => dict.Entries.Any(entry => Equals(entry.Key, item)),
+            StarlarkString text when item is StarlarkString needle =>
+                text.Value.Contains(needle.Value, StringComparison.Ordinal),
+            _ => throw new InvalidOperationException(
+                $"Membership not supported for '{container.TypeName}'.")
+        };
+    }
+
+    private static bool ContainsValue(IReadOnlyList<StarlarkValue> items, StarlarkValue item)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (Equals(items[i], item))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)

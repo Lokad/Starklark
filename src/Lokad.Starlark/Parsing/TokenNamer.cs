@@ -25,6 +25,7 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.And => "'and'",
             Token.Or => "'or'",
             Token.Not => "'not'",
+            Token.In => "'in'",
             Token.If => "'if'",
             Token.Else => "'else'",
             Token.None => "'None'",

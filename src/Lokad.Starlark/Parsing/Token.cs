@@ -19,6 +19,7 @@ public enum Token
     [Any("and"), F(Id, true)] And,
     [Any("or"), F(Id, true)] Or,
     [Any("not"), F(Id, true)] Not,
+    [Any("in"), F(Id, true)] In,
     [Any("True"), F(Id, true)] True,
     [Any("False"), F(Id, true)] False,
 

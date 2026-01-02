@@ -38,6 +38,7 @@ public enum BinaryOperator
     Divide,
     Equal,
     NotEqual,
+    In,
     And,
     Or
 }
@@ -56,6 +57,7 @@ public static class BinaryOperatorExtensions
             BinaryOperator.Subtract => 2,
             BinaryOperator.Equal => 1,
             BinaryOperator.NotEqual => 1,
+            BinaryOperator.In => 1,
             BinaryOperator.And => 0,
             BinaryOperator.Or => 0,
             _ => 0
