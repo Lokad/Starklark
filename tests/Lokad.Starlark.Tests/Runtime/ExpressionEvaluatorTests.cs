@@ -65,4 +65,18 @@ public sealed class ExpressionEvaluatorTests
             item => Assert.Equal(new StarlarkInt(1), item),
             item => Assert.Equal(new StarlarkInt(2), item));
     }
+
+    [Fact]
+    public void EvaluatesTupleLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("(1, 2)");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        var tuple = Assert.IsType<StarlarkTuple>(result);
+        Assert.Collection(
+            tuple.Items,
+            item => Assert.Equal(new StarlarkInt(1), item),
+            item => Assert.Equal(new StarlarkInt(2), item));
+    }
 }

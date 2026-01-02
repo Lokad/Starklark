@@ -39,6 +39,12 @@ public sealed record StarlarkList(IReadOnlyList<StarlarkValue> Items) : Starlark
     public override bool IsTruthy => Items.Count != 0;
 }
 
+public sealed record StarlarkTuple(IReadOnlyList<StarlarkValue> Items) : StarlarkValue
+{
+    public override string TypeName => "tuple";
+    public override bool IsTruthy => Items.Count != 0;
+}
+
 public sealed record StarlarkNone : StarlarkValue
 {
     public static readonly StarlarkNone Instance = new StarlarkNone();

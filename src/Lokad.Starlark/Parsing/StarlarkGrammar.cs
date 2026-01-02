@@ -50,6 +50,25 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     }
 
     [Rule]
+    public Expression TupleLiteral(
+        [T(Token.OpenParen)] Token open,
+        [L(Sep = Token.Comma, Min = 2)] Expression[] items,
+        [T(Token.CloseParen)] Token close)
+    {
+        return new TupleExpression(items);
+    }
+
+    [Rule]
+    public Expression SingleTupleLiteral(
+        [T(Token.OpenParen)] Token open,
+        [NT] Expression item,
+        [T(Token.Comma)] Token comma,
+        [T(Token.CloseParen)] Token close)
+    {
+        return new TupleExpression(new[] { item });
+    }
+
+    [Rule]
     public Expression Call(
         [NT(0)] Expression callee,
         [T(Token.OpenParen)] Token open,

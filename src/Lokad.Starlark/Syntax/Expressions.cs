@@ -16,6 +16,8 @@ public sealed record CallExpression(Expression Callee, IReadOnlyList<Expression>
 
 public sealed record ListExpression(IReadOnlyList<Expression> Items) : Expression;
 
+public sealed record TupleExpression(IReadOnlyList<Expression> Items) : Expression;
+
 public enum UnaryOperator
 {
     Negate,

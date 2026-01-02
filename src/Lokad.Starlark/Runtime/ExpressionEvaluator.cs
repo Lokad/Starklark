@@ -14,6 +14,7 @@ public sealed class ExpressionEvaluator
             BinaryExpression binary => EvaluateBinary(binary, environment),
             CallExpression call => EvaluateCall(call, environment),
             ListExpression list => EvaluateList(list, environment),
+            TupleExpression tuple => EvaluateTuple(tuple, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
     }
@@ -123,6 +124,17 @@ public sealed class ExpressionEvaluator
         }
 
         return new StarlarkList(items);
+    }
+
+    private StarlarkValue EvaluateTuple(TupleExpression tuple, StarlarkEnvironment environment)
+    {
+        var items = new StarlarkValue[tuple.Items.Count];
+        for (var i = 0; i < tuple.Items.Count; i++)
+        {
+            items[i] = Evaluate(tuple.Items[i], environment);
+        }
+
+        return new StarlarkTuple(items);
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)
