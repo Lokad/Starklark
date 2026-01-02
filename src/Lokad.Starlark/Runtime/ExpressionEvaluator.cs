@@ -449,9 +449,31 @@ public sealed class ExpressionEvaluator
             StarlarkDict dict => dict.Entries.Any(entry => Equals(entry.Key, item)),
             StarlarkString text when item is StarlarkString needle =>
                 text.Value.Contains(needle.Value, StringComparison.Ordinal),
+            StarlarkRange range when item is StarlarkInt intValue =>
+                IsInRange(intValue.Value, range),
             _ => throw new InvalidOperationException(
                 $"Membership not supported for '{container.TypeName}'.")
         };
+    }
+
+    private static bool IsInRange(long value, StarlarkRange range)
+    {
+        if (range.Step > 0)
+        {
+            if (value < range.Start || value >= range.Stop)
+            {
+                return false;
+            }
+
+            return (value - range.Start) % range.Step == 0;
+        }
+
+        if (value > range.Start || value <= range.Stop)
+        {
+            return false;
+        }
+
+        return (range.Start - value) % (-range.Step) == 0;
     }
 
     private static bool ContainsValue(IReadOnlyList<StarlarkValue> items, StarlarkValue item)

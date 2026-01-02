@@ -115,4 +115,15 @@ public sealed class ModuleEvaluatorTests
 
         Assert.Equal(new StarlarkInt(3), result);
     }
+
+    [Fact]
+    public void ExecutesLenAndRangeBuiltins()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("len(list(range(4)))\n", environment);
+
+        Assert.Equal(new StarlarkInt(4), result);
+    }
 }

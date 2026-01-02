@@ -28,6 +28,11 @@ public sealed class StarlarkEnvironment
         _modules = parent == null
             ? new Dictionary<string, IReadOnlyDictionary<string, StarlarkValue>>(StringComparer.Ordinal)
             : parent._modules;
+
+        if (parent == null)
+        {
+            StarlarkBuiltins.Register(this);
+        }
     }
 
     public StarlarkEnvironment CreateChild()

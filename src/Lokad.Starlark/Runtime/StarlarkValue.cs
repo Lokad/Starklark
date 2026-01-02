@@ -65,6 +65,16 @@ public sealed record StarlarkDict : StarlarkValue
     public override bool IsTruthy => Entries.Count != 0;
 }
 
+public sealed record StarlarkRange(long Start, long Stop, long Step) : StarlarkValue
+{
+    public override string TypeName => "range";
+    public override bool IsTruthy => Count > 0;
+
+    public long Count => Step > 0
+        ? Start >= Stop ? 0 : (Stop - Start + Step - 1) / Step
+        : Start <= Stop ? 0 : (Start - Stop - Step - 1) / -Step;
+}
+
 public sealed record StarlarkNone : StarlarkValue
 {
     public static readonly StarlarkNone Instance = new StarlarkNone();

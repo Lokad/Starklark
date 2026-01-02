@@ -718,6 +718,22 @@ public sealed class ModuleEvaluator
                     yield return entry.Key;
                 }
                 yield break;
+            case StarlarkRange range:
+                if (range.Step > 0)
+                {
+                    for (var i = range.Start; i < range.Stop; i += range.Step)
+                    {
+                        yield return new StarlarkInt(i);
+                    }
+                }
+                else
+                {
+                    for (var i = range.Start; i > range.Stop; i += range.Step)
+                    {
+                        yield return new StarlarkInt(i);
+                    }
+                }
+                yield break;
             default:
                 throw new InvalidOperationException(
                     $"Type '{iterable.TypeName}' is not iterable.");
