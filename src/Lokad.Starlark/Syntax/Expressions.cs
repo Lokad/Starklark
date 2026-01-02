@@ -14,6 +14,8 @@ public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, 
 
 public sealed record CallExpression(Expression Callee, IReadOnlyList<Expression> Arguments) : Expression;
 
+public sealed record ListExpression(IReadOnlyList<Expression> Items) : Expression;
+
 public enum UnaryOperator
 {
     Negate,

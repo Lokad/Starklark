@@ -32,6 +32,8 @@ public enum Token
 
     [Any("(")] OpenParen,
     [Any(")")] CloseParen,
+    [Any("[")] OpenBracket,
+    [Any("]")] CloseBracket,
     [Any(",")] Comma,
     [Any(":")] Colon,
 

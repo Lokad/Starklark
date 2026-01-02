@@ -37,6 +37,8 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.Slash => "'/'",
             Token.OpenParen => "'('",
             Token.CloseParen => "')'",
+            Token.OpenBracket => "'['",
+            Token.CloseBracket => "']'",
             Token.Comma => "','",
             Token.Colon => "':'",
             _ => token.ToString()

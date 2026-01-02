@@ -33,6 +33,12 @@ public sealed record StarlarkString(string Value) : StarlarkValue
     public override bool IsTruthy => Value.Length != 0;
 }
 
+public sealed record StarlarkList(IReadOnlyList<StarlarkValue> Items) : StarlarkValue
+{
+    public override string TypeName => "list";
+    public override bool IsTruthy => Items.Count != 0;
+}
+
 public sealed record StarlarkNone : StarlarkValue
 {
     public static readonly StarlarkNone Instance = new StarlarkNone();

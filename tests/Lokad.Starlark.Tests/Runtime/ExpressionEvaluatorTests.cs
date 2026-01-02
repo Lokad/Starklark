@@ -51,4 +51,18 @@ public sealed class ExpressionEvaluatorTests
 
         Assert.Same(StarlarkNone.Instance, result);
     }
+
+    [Fact]
+    public void EvaluatesListLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("[1, 2]");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        var list = Assert.IsType<StarlarkList>(result);
+        Assert.Collection(
+            list.Items,
+            item => Assert.Equal(new StarlarkInt(1), item),
+            item => Assert.Equal(new StarlarkInt(2), item));
+    }
 }

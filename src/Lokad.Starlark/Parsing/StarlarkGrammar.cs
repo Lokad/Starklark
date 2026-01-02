@@ -59,6 +59,15 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new CallExpression(callee, args);
     }
 
+    [Rule]
+    public Expression ListLiteral(
+        [T(Token.OpenBracket)] Token open,
+        [L(Sep = Token.Comma)] Expression[] items,
+        [T(Token.CloseBracket)] Token close)
+    {
+        return new ListExpression(items);
+    }
+
     [Rule(Rank = 1)]
     public Expression Unary(
         [T(Token.Minus, Token.Not)] Token op,

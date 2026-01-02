@@ -42,4 +42,16 @@ public sealed class ExpressionParsingTests
 
         Assert.Equal(new LiteralExpression(null!), expr);
     }
+
+    [Fact]
+    public void ParsesListLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("[1, 2]");
+
+        var list = Assert.IsType<ListExpression>(expr);
+        Assert.Collection(
+            list.Items,
+            item => Assert.Equal(new LiteralExpression(1L), item),
+            item => Assert.Equal(new LiteralExpression(2L), item));
+    }
 }
