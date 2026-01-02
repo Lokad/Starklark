@@ -17,6 +17,9 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public Expression FalseLiteral([T(Token.False)] Token value) => new LiteralExpression(false);
 
     [Rule]
+    public Expression NoneLiteral([T(Token.None)] Token value) => new LiteralExpression(null!);
+
+    [Rule]
     public Expression NumberLiteral([T(Token.Number)] string value)
     {
         if (value.Contains('.') || value.Contains('e') || value.Contains('E'))

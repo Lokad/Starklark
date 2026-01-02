@@ -41,4 +41,14 @@ public sealed class ExpressionEvaluatorTests
 
         Assert.Equal(new StarlarkInt(3), result);
     }
+
+    [Fact]
+    public void EvaluatesNoneLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("None");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Same(StarlarkNone.Instance, result);
+    }
 }

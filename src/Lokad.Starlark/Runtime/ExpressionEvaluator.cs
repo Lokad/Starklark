@@ -21,6 +21,7 @@ public sealed class ExpressionEvaluator
     {
         return value switch
         {
+            null => StarlarkNone.Instance,
             bool b => new StarlarkBool(b),
             long l => new StarlarkInt(l),
             int i => new StarlarkInt(i),

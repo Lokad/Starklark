@@ -27,6 +27,7 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.Not => "'not'",
             Token.If => "'if'",
             Token.Else => "'else'",
+            Token.None => "'None'",
             Token.Equal => "'=='",
             Token.NotEqual => "'!='",
             Token.Assign => "'='",

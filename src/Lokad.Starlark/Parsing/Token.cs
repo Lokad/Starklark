@@ -40,6 +40,7 @@ public enum Token
 
     [Any("if"), F(Id, true)] If,
     [Any("else"), F(Id, true)] Else,
+    [Any("None"), F(Id, true)] None,
 
     [Pattern("[0-9]+(\\.[0-9]+)?", Start = "0123456789")]
     Number,

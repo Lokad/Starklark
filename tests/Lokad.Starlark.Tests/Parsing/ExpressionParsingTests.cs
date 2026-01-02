@@ -34,4 +34,12 @@ public sealed class ExpressionParsingTests
 
         Assert.Equal(expected, expr);
     }
+
+    [Fact]
+    public void ParsesNoneLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("None");
+
+        Assert.Equal(new LiteralExpression(null!), expr);
+    }
 }
