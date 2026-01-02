@@ -63,17 +63,30 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
 
     [Rule]
     public SimpleStatement Assignment(
-        [T(Token.Id)] string name,
+        [NT] Expression target,
         [T(Token.Assign)] Token assign,
         [NT] Expression value)
     {
-        return new SimpleStatement(new AssignmentStatement(name, value));
+        return new SimpleStatement(new AssignmentStatement(ToAssignmentTarget(target), value));
     }
 
     [Rule]
     public SimpleStatement ExpressionStatement([NT] Expression expression)
     {
         return new SimpleStatement(new ExpressionStatement(expression));
+    }
+
+    private static AssignmentTarget ToAssignmentTarget(Expression expression)
+    {
+        return expression switch
+        {
+            IdentifierExpression identifier => new NameTarget(identifier.Name),
+            IndexExpression index => new IndexTarget(index.Target, index.Index),
+            ListExpression list => new ListTarget(list.Items.Select(ToAssignmentTarget).ToArray()),
+            TupleExpression tuple => new TupleTarget(tuple.Items.Select(ToAssignmentTarget).ToArray()),
+            _ => throw new InvalidOperationException(
+                $"Invalid assignment target '{expression.GetType().Name}'.")
+        };
     }
 
     [Rule]

@@ -58,7 +58,7 @@ public sealed class ModuleEvaluator
             {
                 case AssignmentStatement assignment:
                     var value = _expressionEvaluator.Evaluate(assignment.Value, environment);
-                    environment.Set(assignment.Name, value);
+                    AssignTarget(assignment.Target, value, environment);
                     lastValue = null;
                     break;
                 case ExpressionStatement expressionStatement:
@@ -160,6 +160,113 @@ public sealed class ModuleEvaluator
 
             environment.Set(binding.Alias, value);
         }
+    }
+
+    private void AssignTarget(AssignmentTarget target, StarlarkValue value, StarlarkEnvironment environment)
+    {
+        switch (target)
+        {
+            case NameTarget nameTarget:
+                environment.Set(nameTarget.Name, value);
+                break;
+            case IndexTarget indexTarget:
+                AssignIndexTarget(indexTarget, value, environment);
+                break;
+            case TupleTarget tupleTarget:
+                AssignSequenceTargets(tupleTarget.Items, value, environment);
+                break;
+            case ListTarget listTarget:
+                AssignSequenceTargets(listTarget.Items, value, environment);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported assignment target '{target.GetType().Name}'.");
+        }
+    }
+
+    private void AssignIndexTarget(IndexTarget target, StarlarkValue value, StarlarkEnvironment environment)
+    {
+        var container = _expressionEvaluator.Evaluate(target.Target, environment);
+        var index = _expressionEvaluator.Evaluate(target.Index, environment);
+
+        switch (container)
+        {
+            case StarlarkList list:
+                AssignListIndex(list, index, value);
+                break;
+            case StarlarkDict dict:
+                AssignDictIndex(dict, index, value);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Index assignment not supported for '{container.TypeName}'.");
+        }
+    }
+
+    private void AssignSequenceTargets(
+        IReadOnlyList<AssignmentTarget> targets,
+        StarlarkValue value,
+        StarlarkEnvironment environment)
+    {
+        var items = ExtractSequenceItems(value);
+        if (items.Count != targets.Count)
+        {
+            throw new InvalidOperationException(
+                $"Assignment length mismatch. Expected {targets.Count} values but got {items.Count}.");
+        }
+
+        for (var i = 0; i < targets.Count; i++)
+        {
+            AssignTarget(targets[i], items[i], environment);
+        }
+    }
+
+    private static IReadOnlyList<StarlarkValue> ExtractSequenceItems(StarlarkValue value)
+    {
+        return value switch
+        {
+            StarlarkList list => list.Items,
+            StarlarkTuple tuple => tuple.Items,
+            _ => throw new InvalidOperationException(
+                $"Value of type '{value.TypeName}' is not iterable for assignment.")
+        };
+    }
+
+    private static void AssignListIndex(StarlarkList list, StarlarkValue index, StarlarkValue value)
+    {
+        if (index is not StarlarkInt intIndex)
+        {
+            throw new InvalidOperationException(
+                $"Index must be an int, got '{index.TypeName}'.");
+        }
+
+        var position = checked((int)intIndex.Value);
+        if (position < 0)
+        {
+            position = list.Items.Count + position;
+        }
+
+        if (position < 0 || position >= list.Items.Count)
+        {
+            throw new IndexOutOfRangeException("Index out of range.");
+        }
+
+        list.Items[position] = value;
+    }
+
+    private static void AssignDictIndex(StarlarkDict dict, StarlarkValue key, StarlarkValue value)
+    {
+        for (var i = 0; i < dict.Entries.Count; i++)
+        {
+            var entry = dict.Entries[i];
+            if (Equals(entry.Key, key))
+            {
+                dict.Entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(entry.Key, value);
+                return;
+            }
+        }
+
+        dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
     }
 
     private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)

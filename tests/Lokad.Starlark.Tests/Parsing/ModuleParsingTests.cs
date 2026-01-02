@@ -13,8 +13,30 @@ public sealed class ModuleParsingTests
 
         var statement = Assert.Single(module.Statements);
         var assignment = Assert.IsType<AssignmentStatement>(statement);
-        Assert.Equal("x", assignment.Name);
+        var target = Assert.IsType<NameTarget>(assignment.Target);
+        Assert.Equal("x", target.Name);
         Assert.Equal(new LiteralExpression(1L), assignment.Value);
+    }
+
+    [Fact]
+    public void ParsesTupleAssignment()
+    {
+        var module = StarlarkModuleParser.ParseModule("a, b = 1, 2\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var target = Assert.IsType<TupleTarget>(assignment.Target);
+        Assert.Equal(2, target.Items.Count);
+    }
+
+    [Fact]
+    public void ParsesIndexAssignment()
+    {
+        var module = StarlarkModuleParser.ParseModule("items[0] = 1\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        Assert.IsType<IndexTarget>(assignment.Target);
     }
 
     [Fact]

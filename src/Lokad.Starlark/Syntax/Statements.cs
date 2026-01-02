@@ -6,7 +6,17 @@ public abstract record Statement;
 
 public sealed record ExpressionStatement(Expression Expression) : Statement;
 
-public sealed record AssignmentStatement(string Name, Expression Value) : Statement;
+public sealed record AssignmentStatement(AssignmentTarget Target, Expression Value) : Statement;
+
+public abstract record AssignmentTarget;
+
+public sealed record NameTarget(string Name) : AssignmentTarget;
+
+public sealed record IndexTarget(Expression Target, Expression Index) : AssignmentTarget;
+
+public sealed record TupleTarget(IReadOnlyList<AssignmentTarget> Items) : AssignmentTarget;
+
+public sealed record ListTarget(IReadOnlyList<AssignmentTarget> Items) : AssignmentTarget;
 
 public sealed record IfClause(Expression Condition, IReadOnlyList<Statement> Statements);
 

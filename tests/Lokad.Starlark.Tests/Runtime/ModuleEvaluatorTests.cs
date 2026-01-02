@@ -71,4 +71,26 @@ public sealed class ModuleEvaluatorTests
 
         Assert.Equal(new StarlarkFloat(9.42), result);
     }
+
+    [Fact]
+    public void ExecutesTupleAssignment()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("a, b = 1, 2\na + b\n", environment);
+
+        Assert.Equal(new StarlarkInt(3), result);
+    }
+
+    [Fact]
+    public void ExecutesIndexAssignment()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("items = [1, 2]\nitems[0] = 3\nitems[0]\n", environment);
+
+        Assert.Equal(new StarlarkInt(3), result);
+    }
 }

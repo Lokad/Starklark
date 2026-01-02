@@ -90,9 +90,9 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public DictEntry DictEntry(
-        [NT] Expression key,
+        [NT(3)] Expression key,
         [T(Token.Colon)] Token colon,
-        [NT] Expression value)
+        [NT(3)] Expression value)
     {
         return new DictEntry(key, value);
     }
@@ -229,6 +229,23 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     {
         return new ConditionalExpression(condition, thenExpression, elseExpression);
     }
+
+    [Rule(Rank = 4)]
+    public Expression TupleExpression(
+        [NT(2)] Expression first,
+        [T(Token.Comma)] Token comma,
+        [L(Sep = Token.Comma)] Expression[] rest)
+    {
+        var items = new Expression[rest.Length + 1];
+        items[0] = first;
+        for (var i = 0; i < rest.Length; i++)
+        {
+            items[i + 1] = rest[i];
+        }
+
+        return new TupleExpression(items);
+    }
+
 
     [Rule]
     public LineEnding LineEnding([T(Token.EoL)] Token token) => new LineEnding();

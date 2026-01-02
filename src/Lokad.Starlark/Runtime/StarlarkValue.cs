@@ -33,8 +33,15 @@ public sealed record StarlarkString(string Value) : StarlarkValue
     public override bool IsTruthy => Value.Length != 0;
 }
 
-public sealed record StarlarkList(IReadOnlyList<StarlarkValue> Items) : StarlarkValue
+public sealed record StarlarkList : StarlarkValue
 {
+    public StarlarkList(IEnumerable<StarlarkValue> items)
+    {
+        Items = new List<StarlarkValue>(items);
+    }
+
+    public List<StarlarkValue> Items { get; }
+
     public override string TypeName => "list";
     public override bool IsTruthy => Items.Count != 0;
 }
@@ -45,9 +52,15 @@ public sealed record StarlarkTuple(IReadOnlyList<StarlarkValue> Items) : Starlar
     public override bool IsTruthy => Items.Count != 0;
 }
 
-public sealed record StarlarkDict(IReadOnlyList<KeyValuePair<StarlarkValue, StarlarkValue>> Entries)
-    : StarlarkValue
+public sealed record StarlarkDict : StarlarkValue
 {
+    public StarlarkDict(IEnumerable<KeyValuePair<StarlarkValue, StarlarkValue>> entries)
+    {
+        Entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>(entries);
+    }
+
+    public List<KeyValuePair<StarlarkValue, StarlarkValue>> Entries { get; }
+
     public override string TypeName => "dict";
     public override bool IsTruthy => Entries.Count != 0;
 }

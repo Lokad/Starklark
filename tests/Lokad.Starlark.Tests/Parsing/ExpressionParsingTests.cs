@@ -77,6 +77,18 @@ public sealed class ExpressionParsingTests
     }
 
     [Fact]
+    public void ParsesTupleWithoutParentheses()
+    {
+        var expr = StarlarkParser.ParseExpression("1, 2");
+
+        var tuple = Assert.IsType<TupleExpression>(expr);
+        Assert.Collection(
+            tuple.Items,
+            item => Assert.Equal(new LiteralExpression(1L), item),
+            item => Assert.Equal(new LiteralExpression(2L), item));
+    }
+
+    [Fact]
     public void ParsesDictLiteral()
     {
         var expr = StarlarkParser.ParseExpression("{\"a\": 1, \"b\": 2}");
