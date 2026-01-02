@@ -14,6 +14,7 @@ public sealed class TokenNamer : ITokenNamer<Token>
         {
             Token.Error => "error",
             Token.EoS => "end-of-script",
+            Token.EoL => "end-of-line",
             Token.Id => "identifier",
             Token.Number => "number",
             Token.String => "string",

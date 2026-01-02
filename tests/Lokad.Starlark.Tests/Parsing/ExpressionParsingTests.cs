@@ -21,4 +21,17 @@ public sealed class ExpressionParsingTests
 
         Assert.Equal(expected, expr);
     }
+
+    [Fact]
+    public void ParsesTrailingNewline()
+    {
+        var expr = StarlarkParser.ParseExpression("1 + 2\n");
+
+        var expected = new BinaryExpression(
+            new LiteralExpression(1L),
+            BinaryOperator.Add,
+            new LiteralExpression(2L));
+
+        Assert.Equal(expected, expr);
+    }
 }

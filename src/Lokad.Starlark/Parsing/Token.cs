@@ -7,11 +7,12 @@ public sealed class FAttribute : FromAttribute
     public FAttribute(Token parent, bool isPrivate = false) : base((int)parent, isPrivate) { }
 }
 
-[Tokens(Comments = "#[^\\n]*")]
+[Tokens(Comments = "#[^\\n]*", EscapeNewlines = true)]
 public enum Token
 {
     [Error] Error,
     [End] EoS,
+    [EndOfLine] EoL,
 
     [Any("and"), F(Id, true)] And,
     [Any("or"), F(Id, true)] Or,

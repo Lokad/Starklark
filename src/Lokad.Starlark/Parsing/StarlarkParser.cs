@@ -40,7 +40,10 @@ public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expres
     }
 
     [Rule]
-    public ExpressionRoot Root([NT] Expression expr, [T(Token.EoS)] Token eos)
+    public ExpressionRoot Root(
+        [NT] Expression expr,
+        [L] LineEnding[] trailing,
+        [T(Token.EoS)] Token eos)
     {
         return new ExpressionRoot(expr);
     }
@@ -163,9 +166,13 @@ public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expres
 
         return left;
     }
+
+    [Rule]
+    public LineEnding LineEnding([T(Token.EoL)] Token token) => new LineEnding();
 }
 
 public readonly record struct ExpressionRoot(Expression Expression);
+public readonly record struct LineEnding;
 
 public sealed class StarlarkParseException : Exception
 {
