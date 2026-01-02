@@ -127,6 +127,16 @@ public sealed class ExpressionEvaluatorTests
     }
 
     [Fact]
+    public void EvaluatesSliceExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("\"abcd\"[1:3]");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkString("bc"), result);
+    }
+
+    [Fact]
     public void EvaluatesInExpression()
     {
         var expr = StarlarkParser.ParseExpression("1 in [1, 2]");

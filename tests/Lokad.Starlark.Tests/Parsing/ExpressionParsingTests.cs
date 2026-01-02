@@ -115,7 +115,20 @@ public sealed class ExpressionParsingTests
 
         var index = Assert.IsType<IndexExpression>(expr);
         Assert.Equal(new IdentifierExpression("items"), index.Target);
-        Assert.Equal(new LiteralExpression(0L), index.Index);
+        var indexValue = Assert.IsType<IndexValue>(index.Index);
+        Assert.Equal(new LiteralExpression(0L), indexValue.Value);
+    }
+
+    [Fact]
+    public void ParsesSliceExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("items[1:3]");
+
+        var index = Assert.IsType<IndexExpression>(expr);
+        var slice = Assert.IsType<SliceIndex>(index.Index);
+        Assert.Equal(new LiteralExpression(1L), slice.Start);
+        Assert.Equal(new LiteralExpression(3L), slice.Stop);
+        Assert.Null(slice.Step);
     }
 
     [Fact]

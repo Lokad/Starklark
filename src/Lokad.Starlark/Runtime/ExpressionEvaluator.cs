@@ -176,7 +176,20 @@ public sealed class ExpressionEvaluator
     private StarlarkValue EvaluateIndex(IndexExpression index, StarlarkEnvironment environment)
     {
         var target = Evaluate(index.Target, environment);
-        var key = Evaluate(index.Index, environment);
+        return index.Index switch
+        {
+            IndexValue value => EvaluateIndexValue(target, value, environment),
+            SliceIndex slice => EvaluateSlice(target, slice, environment),
+            _ => throw new InvalidOperationException("Unsupported index specifier.")
+        };
+    }
+
+    private StarlarkValue EvaluateIndexValue(
+        StarlarkValue target,
+        IndexValue value,
+        StarlarkEnvironment environment)
+    {
+        var key = Evaluate(value.Value, environment);
 
         return target switch
         {
@@ -187,6 +200,188 @@ public sealed class ExpressionEvaluator
             _ => throw new InvalidOperationException(
                 $"Indexing not supported for type '{target.TypeName}'.")
         };
+    }
+
+    private StarlarkValue EvaluateSlice(
+        StarlarkValue target,
+        SliceIndex slice,
+        StarlarkEnvironment environment)
+    {
+        var start = EvaluateOptional(slice.Start, environment);
+        var stop = EvaluateOptional(slice.Stop, environment);
+        var step = EvaluateOptional(slice.Step, environment);
+
+        return target switch
+        {
+            StarlarkList list => SliceList(list, start, stop, step),
+            StarlarkTuple tuple => SliceTuple(tuple, start, stop, step),
+            StarlarkString text => SliceString(text, start, stop, step),
+            _ => throw new InvalidOperationException(
+                $"Slicing not supported for type '{target.TypeName}'.")
+        };
+    }
+
+    private StarlarkInt? EvaluateOptional(Expression? expression, StarlarkEnvironment environment)
+    {
+        if (expression == null)
+        {
+            return null;
+        }
+
+        var value = Evaluate(expression, environment);
+        if (value is StarlarkInt intValue)
+        {
+            return intValue;
+        }
+
+        throw new InvalidOperationException(
+            $"Slice indices must be int, got '{value.TypeName}'.");
+    }
+
+    private static StarlarkValue SliceList(
+        StarlarkList list,
+        StarlarkInt? start,
+        StarlarkInt? stop,
+        StarlarkInt? step)
+    {
+        var (from, to, stride) = NormalizeSlice(list.Items.Count, start, stop, step);
+        var result = new List<StarlarkValue>();
+        if (stride > 0)
+        {
+            for (var i = from; i < to; i += stride)
+            {
+                result.Add(list.Items[i]);
+            }
+        }
+        else
+        {
+            for (var i = from; i > to; i += stride)
+            {
+                result.Add(list.Items[i]);
+            }
+        }
+
+        return new StarlarkList(result);
+    }
+
+    private static StarlarkValue SliceTuple(
+        StarlarkTuple tuple,
+        StarlarkInt? start,
+        StarlarkInt? stop,
+        StarlarkInt? step)
+    {
+        var (from, to, stride) = NormalizeSlice(tuple.Items.Count, start, stop, step);
+        var result = new List<StarlarkValue>();
+        if (stride > 0)
+        {
+            for (var i = from; i < to; i += stride)
+            {
+                result.Add(tuple.Items[i]);
+            }
+        }
+        else
+        {
+            for (var i = from; i > to; i += stride)
+            {
+                result.Add(tuple.Items[i]);
+            }
+        }
+
+        return new StarlarkTuple(result);
+    }
+
+    private static StarlarkValue SliceString(
+        StarlarkString text,
+        StarlarkInt? start,
+        StarlarkInt? stop,
+        StarlarkInt? step)
+    {
+        var (from, to, stride) = NormalizeSlice(text.Value.Length, start, stop, step);
+        var builder = new System.Text.StringBuilder();
+        if (stride > 0)
+        {
+            for (var i = from; i < to; i += stride)
+            {
+                builder.Append(text.Value[i]);
+            }
+        }
+        else
+        {
+            for (var i = from; i > to; i += stride)
+            {
+                builder.Append(text.Value[i]);
+            }
+        }
+
+        return new StarlarkString(builder.ToString());
+    }
+
+    private static (int Start, int Stop, int Step) NormalizeSlice(
+        int length,
+        StarlarkInt? start,
+        StarlarkInt? stop,
+        StarlarkInt? step)
+    {
+        var stride = step?.Value ?? 1;
+        if (stride == 0)
+        {
+            throw new InvalidOperationException("Slice step cannot be zero.");
+        }
+
+        var stepValue = checked((int)stride);
+        if (stepValue > 0)
+        {
+            var from = NormalizeIndex(start?.Value, length, defaultValue: 0, clamp: true);
+            var to = NormalizeIndex(stop?.Value, length, defaultValue: length, clamp: true);
+            return (from, to, stepValue);
+        }
+        else
+        {
+            var from = NormalizeIndex(start?.Value, length, defaultValue: length - 1, clamp: false);
+            var to = NormalizeIndex(stop?.Value, length, defaultValue: -1, clamp: false);
+            return (from, to, stepValue);
+        }
+    }
+
+    private static int NormalizeIndex(long? value, int length, int defaultValue, bool clamp)
+    {
+        if (value == null)
+        {
+            return defaultValue;
+        }
+
+        var index = checked((int)value.Value);
+        if (index < 0)
+        {
+            index += length;
+        }
+
+        if (clamp)
+        {
+            if (index < 0)
+            {
+                return 0;
+            }
+
+            if (index > length)
+            {
+                return length;
+            }
+        }
+        else
+        {
+            if (index < -1)
+            {
+                return -1;
+            }
+
+            if (index >= length)
+            {
+                return length - 1;
+            }
+        }
+
+        return index;
     }
 
     private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index)

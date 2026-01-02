@@ -110,10 +110,34 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public Expression Index(
         [NT(0)] Expression target,
         [T(Token.OpenBracket)] Token open,
-        [NT] Expression index,
+        [NT] IndexSpecifier index,
         [T(Token.CloseBracket)] Token close)
     {
         return new IndexExpression(target, index);
+    }
+
+    [Rule]
+    public IndexSpecifier IndexValue([NT] Expression value)
+    {
+        return new IndexValue(value);
+    }
+
+    [Rule]
+    public IndexSpecifier SliceIndex(
+        [NTO] Expression? start,
+        [T(Token.Colon)] Token colon,
+        [NTO] Expression? stop,
+        [NTO] SliceStep? step)
+    {
+        return new SliceIndex(start, stop, step?.Step);
+    }
+
+    [Rule]
+    public SliceStep SliceStep(
+        [T(Token.Colon)] Token colon,
+        [NTO] Expression? step)
+    {
+        return new SliceStep(step);
     }
 
     [Rule(Rank = 1)]
@@ -365,6 +389,8 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 }
 
 public readonly record struct LineEnding;
+
+public readonly record struct SliceStep(Expression? Step);
 
 public class TAttribute : TerminalAttribute
 {

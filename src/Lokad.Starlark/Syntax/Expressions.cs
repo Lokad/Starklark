@@ -22,7 +22,13 @@ public sealed record DictExpression(IReadOnlyList<DictEntry> Entries) : Expressi
 
 public sealed record DictEntry(Expression Key, Expression Value);
 
-public sealed record IndexExpression(Expression Target, Expression Index) : Expression;
+public abstract record IndexSpecifier;
+
+public sealed record IndexValue(Expression Value) : IndexSpecifier;
+
+public sealed record SliceIndex(Expression? Start, Expression? Stop, Expression? Step) : IndexSpecifier;
+
+public sealed record IndexExpression(Expression Target, IndexSpecifier Index) : Expression;
 
 public sealed record ConditionalExpression(
     Expression Condition,
