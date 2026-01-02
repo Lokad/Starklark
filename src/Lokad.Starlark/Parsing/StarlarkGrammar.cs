@@ -87,6 +87,24 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new ListExpression(items);
     }
 
+    [Rule]
+    public DictEntry DictEntry(
+        [NT] Expression key,
+        [T(Token.Colon)] Token colon,
+        [NT] Expression value)
+    {
+        return new DictEntry(key, value);
+    }
+
+    [Rule]
+    public Expression DictLiteral(
+        [T(Token.OpenBrace)] Token open,
+        [L(Sep = Token.Comma)] DictEntry[] entries,
+        [T(Token.CloseBrace)] Token close)
+    {
+        return new DictExpression(entries);
+    }
+
     [Rule(Rank = 1)]
     public Expression Unary(
         [T(Token.Minus, Token.Not)] Token op,

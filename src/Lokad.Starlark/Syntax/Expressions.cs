@@ -18,6 +18,10 @@ public sealed record ListExpression(IReadOnlyList<Expression> Items) : Expressio
 
 public sealed record TupleExpression(IReadOnlyList<Expression> Items) : Expression;
 
+public sealed record DictExpression(IReadOnlyList<DictEntry> Entries) : Expression;
+
+public sealed record DictEntry(Expression Key, Expression Value);
+
 public enum UnaryOperator
 {
     Negate,

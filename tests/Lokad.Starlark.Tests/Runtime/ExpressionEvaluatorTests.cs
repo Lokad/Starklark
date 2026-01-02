@@ -79,4 +79,26 @@ public sealed class ExpressionEvaluatorTests
             item => Assert.Equal(new StarlarkInt(1), item),
             item => Assert.Equal(new StarlarkInt(2), item));
     }
+
+    [Fact]
+    public void EvaluatesDictLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("{\"a\": 1, \"b\": 2}");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        var dict = Assert.IsType<StarlarkDict>(result);
+        Assert.Collection(
+            dict.Entries,
+            entry =>
+            {
+                Assert.Equal(new StarlarkString("a"), entry.Key);
+                Assert.Equal(new StarlarkInt(1), entry.Value);
+            },
+            entry =>
+            {
+                Assert.Equal(new StarlarkString("b"), entry.Key);
+                Assert.Equal(new StarlarkInt(2), entry.Value);
+            });
+    }
 }

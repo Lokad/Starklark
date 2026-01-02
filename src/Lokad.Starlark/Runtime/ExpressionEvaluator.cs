@@ -15,6 +15,7 @@ public sealed class ExpressionEvaluator
             CallExpression call => EvaluateCall(call, environment),
             ListExpression list => EvaluateList(list, environment),
             TupleExpression tuple => EvaluateTuple(tuple, environment),
+            DictExpression dict => EvaluateDict(dict, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
     }
@@ -135,6 +136,20 @@ public sealed class ExpressionEvaluator
         }
 
         return new StarlarkTuple(items);
+    }
+
+    private StarlarkValue EvaluateDict(DictExpression dict, StarlarkEnvironment environment)
+    {
+        var entries = new KeyValuePair<StarlarkValue, StarlarkValue>[dict.Entries.Count];
+        for (var i = 0; i < dict.Entries.Count; i++)
+        {
+            var entry = dict.Entries[i];
+            var key = Evaluate(entry.Key, environment);
+            var value = Evaluate(entry.Value, environment);
+            entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
+        }
+
+        return new StarlarkDict(entries);
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)

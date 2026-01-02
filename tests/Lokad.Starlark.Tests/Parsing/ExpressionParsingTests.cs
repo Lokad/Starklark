@@ -75,4 +75,24 @@ public sealed class ExpressionParsingTests
         var tuple = Assert.IsType<TupleExpression>(expr);
         Assert.Collection(tuple.Items, item => Assert.Equal(new LiteralExpression(1L), item));
     }
+
+    [Fact]
+    public void ParsesDictLiteral()
+    {
+        var expr = StarlarkParser.ParseExpression("{\"a\": 1, \"b\": 2}");
+
+        var dict = Assert.IsType<DictExpression>(expr);
+        Assert.Collection(
+            dict.Entries,
+            entry =>
+            {
+                Assert.Equal(new LiteralExpression("a"), entry.Key);
+                Assert.Equal(new LiteralExpression(1L), entry.Value);
+            },
+            entry =>
+            {
+                Assert.Equal(new LiteralExpression("b"), entry.Key);
+                Assert.Equal(new LiteralExpression(2L), entry.Value);
+            });
+    }
 }
