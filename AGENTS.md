@@ -15,7 +15,7 @@ dotnet test    --tl:off --nologo -v minimal --no-build
 ## Commit hygiene
 
 - Before every commit, review whether `AGENTS.md` needs updates for new workflows or constraints.
-- After every complex commit, review the full diff to confirm there are no accidental or irrelevant changes.
+- After every complex commit, review the full diff and the commit content to confirm there are no accidental or irrelevant changes.
 
 ## ExecPlans
 

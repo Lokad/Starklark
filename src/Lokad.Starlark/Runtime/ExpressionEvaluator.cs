@@ -166,6 +166,7 @@ public sealed class ExpressionEvaluator
         {
             var entry = dict.Entries[i];
             var key = Evaluate(entry.Key, environment);
+            StarlarkHash.EnsureHashable(key);
             var value = Evaluate(entry.Value, environment);
             entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
         }
@@ -407,6 +408,7 @@ public sealed class ExpressionEvaluator
 
     private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
     {
+        StarlarkHash.EnsureHashable(key);
         foreach (var entry in dict.Entries)
         {
             if (Equals(entry.Key, key))
@@ -446,7 +448,7 @@ public sealed class ExpressionEvaluator
         {
             StarlarkList list => ContainsValue(list.Items, item),
             StarlarkTuple tuple => ContainsValue(tuple.Items, item),
-            StarlarkDict dict => dict.Entries.Any(entry => Equals(entry.Key, item)),
+            StarlarkDict dict => IsInDict(item, dict),
             StarlarkString text when item is StarlarkString needle =>
                 text.Value.Contains(needle.Value, StringComparison.Ordinal),
             StarlarkRange range when item is StarlarkInt intValue =>
@@ -454,6 +456,12 @@ public sealed class ExpressionEvaluator
             _ => throw new InvalidOperationException(
                 $"Membership not supported for '{container.TypeName}'.")
         };
+    }
+
+    private static bool IsInDict(StarlarkValue item, StarlarkDict dict)
+    {
+        StarlarkHash.EnsureHashable(item);
+        return dict.Entries.Any(entry => Equals(entry.Key, item));
     }
 
     private static bool IsInRange(long value, StarlarkRange range)

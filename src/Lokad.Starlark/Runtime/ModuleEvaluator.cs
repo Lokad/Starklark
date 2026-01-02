@@ -304,6 +304,7 @@ public sealed class ModuleEvaluator
 
     private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
     {
+        StarlarkHash.EnsureHashable(key);
         foreach (var entry in dict.Entries)
         {
             if (Equals(entry.Key, key))
@@ -677,6 +678,7 @@ public sealed class ModuleEvaluator
 
     private static void AssignDictIndex(StarlarkDict dict, StarlarkValue key, StarlarkValue value)
     {
+        StarlarkHash.EnsureHashable(key);
         for (var i = 0; i < dict.Entries.Count; i++)
         {
             var entry = dict.Entries[i];
