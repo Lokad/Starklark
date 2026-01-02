@@ -8,7 +8,43 @@ public sealed class ModuleEvaluator
 
     public StarlarkValue? ExecuteModule(StarlarkModule module, StarlarkEnvironment environment)
     {
-        return ExecuteStatements(module.Statements, environment);
+        try
+        {
+            return ExecuteStatements(module.Statements, environment);
+        }
+        catch (ReturnSignal)
+        {
+            throw new InvalidOperationException("Return statement is not allowed at module scope.");
+        }
+        catch (BreakSignal)
+        {
+            throw new InvalidOperationException("Break statement is not allowed at module scope.");
+        }
+        catch (ContinueSignal)
+        {
+            throw new InvalidOperationException("Continue statement is not allowed at module scope.");
+        }
+    }
+
+    public StarlarkValue ExecuteFunctionBody(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
+    {
+        try
+        {
+            ExecuteStatements(statements, environment);
+            return StarlarkNone.Instance;
+        }
+        catch (ReturnSignal signal)
+        {
+            return signal.Value;
+        }
+        catch (BreakSignal)
+        {
+            throw new InvalidOperationException("Break statement is only valid inside loops.");
+        }
+        catch (ContinueSignal)
+        {
+            throw new InvalidOperationException("Continue statement is only valid inside loops.");
+        }
     }
 
     private StarlarkValue? ExecuteStatements(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
@@ -28,11 +64,31 @@ public sealed class ModuleEvaluator
                     lastValue = _expressionEvaluator.Evaluate(expressionStatement.Expression, environment);
                     break;
                 case IfStatement ifStatement:
-                    var condition = _expressionEvaluator.Evaluate(ifStatement.Condition, environment);
-                    var branch = condition.IsTruthy
-                        ? ifStatement.ThenStatements
-                        : ifStatement.ElseStatements;
-                    lastValue = ExecuteStatements(branch, environment);
+                    lastValue = ExecuteIfStatement(ifStatement, environment);
+                    break;
+                case ForStatement forStatement:
+                    lastValue = ExecuteForStatement(forStatement, environment);
+                    break;
+                case FunctionDefinitionStatement functionDefinition:
+                    var function = new StarlarkUserFunction(
+                        functionDefinition.Name,
+                        functionDefinition.Parameters,
+                        functionDefinition.Body,
+                        environment);
+                    environment.Set(functionDefinition.Name, function);
+                    lastValue = null;
+                    break;
+                case ReturnStatement returnStatement:
+                    var returnValue = returnStatement.Value == null
+                        ? StarlarkNone.Instance
+                        : _expressionEvaluator.Evaluate(returnStatement.Value, environment);
+                    throw new ReturnSignal(returnValue);
+                case BreakStatement:
+                    throw new BreakSignal();
+                case ContinueStatement:
+                    throw new ContinueSignal();
+                case PassStatement:
+                    lastValue = null;
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -42,4 +98,91 @@ public sealed class ModuleEvaluator
 
         return lastValue;
     }
+
+    private StarlarkValue? ExecuteIfStatement(IfStatement ifStatement, StarlarkEnvironment environment)
+    {
+        for (var i = 0; i < ifStatement.Clauses.Count; i++)
+        {
+            var clause = ifStatement.Clauses[i];
+            var condition = _expressionEvaluator.Evaluate(clause.Condition, environment);
+            if (condition.IsTruthy)
+            {
+                return ExecuteStatements(clause.Statements, environment);
+            }
+        }
+
+        return ExecuteStatements(ifStatement.ElseStatements, environment);
+    }
+
+    private StarlarkValue? ExecuteForStatement(ForStatement forStatement, StarlarkEnvironment environment)
+    {
+        var iterable = _expressionEvaluator.Evaluate(forStatement.Iterable, environment);
+
+        foreach (var item in Enumerate(iterable))
+        {
+            environment.Set(forStatement.Name, item);
+            try
+            {
+                ExecuteStatements(forStatement.Body, environment);
+            }
+            catch (ContinueSignal)
+            {
+                continue;
+            }
+            catch (BreakSignal)
+            {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)
+    {
+        switch (iterable)
+        {
+            case StarlarkList list:
+                foreach (var item in list.Items)
+                {
+                    yield return item;
+                }
+                yield break;
+            case StarlarkTuple tuple:
+                foreach (var item in tuple.Items)
+                {
+                    yield return item;
+                }
+                yield break;
+            case StarlarkString text:
+                foreach (var ch in text.Value)
+                {
+                    yield return new StarlarkString(ch.ToString());
+                }
+                yield break;
+            case StarlarkDict dict:
+                foreach (var entry in dict.Entries)
+                {
+                    yield return entry.Key;
+                }
+                yield break;
+            default:
+                throw new InvalidOperationException(
+                    $"Type '{iterable.TypeName}' is not iterable.");
+        }
+    }
+
+    private sealed class ReturnSignal : Exception
+    {
+        public ReturnSignal(StarlarkValue value)
+        {
+            Value = value;
+        }
+
+        public StarlarkValue Value { get; }
+    }
+
+    private sealed class BreakSignal : Exception;
+
+    private sealed class ContinueSignal : Exception;
 }

@@ -42,7 +42,7 @@ public sealed class ExpressionEvaluator
 
     private static StarlarkValue ResolveIdentifier(IdentifierExpression identifier, StarlarkEnvironment environment)
     {
-        if (!environment.Globals.TryGetValue(identifier.Name, out var value))
+        if (!environment.TryGet(identifier.Name, out var value))
         {
             throw new KeyNotFoundException($"Undefined identifier '{identifier.Name}'.");
         }
@@ -110,7 +110,7 @@ public sealed class ExpressionEvaluator
     private StarlarkValue EvaluateCall(CallExpression call, StarlarkEnvironment environment)
     {
         var callee = Evaluate(call.Callee, environment);
-        if (callee is not StarlarkFunction function)
+        if (callee is not StarlarkCallable function)
         {
             throw new InvalidOperationException(
                 $"Attempted to call non-callable value of type '{callee.TypeName}'.");

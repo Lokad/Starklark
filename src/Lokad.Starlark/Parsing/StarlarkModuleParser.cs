@@ -77,15 +77,60 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     }
 
     [Rule]
+    public SimpleStatement ReturnStatement(
+        [T(Token.Return)] Token keyword,
+        [NTO] Expression? value)
+    {
+        return new SimpleStatement(new ReturnStatement(value));
+    }
+
+    [Rule]
+    public SimpleStatement BreakStatement([T(Token.Break)] Token keyword)
+    {
+        return new SimpleStatement(new BreakStatement());
+    }
+
+    [Rule]
+    public SimpleStatement ContinueStatement([T(Token.Continue)] Token keyword)
+    {
+        return new SimpleStatement(new ContinueStatement());
+    }
+
+    [Rule]
+    public SimpleStatement PassStatement([T(Token.Pass)] Token keyword)
+    {
+        return new SimpleStatement(new PassStatement());
+    }
+
+    [Rule]
     public CompoundStatement IfStatement(
         [T(Token.If)] Token keyword,
         [NT] Expression condition,
         [T(Token.Colon)] Token colon,
         [NT] Suite thenSuite,
+        [L] ElifClause[] elifClauses,
         [NTO] ElseClause? elseClause)
     {
+        var clauses = new List<IfClause>(1 + elifClauses.Length);
+        clauses.Add(new IfClause(condition, thenSuite.Statements));
+        for (var i = 0; i < elifClauses.Length; i++)
+        {
+            var clause = elifClauses[i];
+            clauses.Add(new IfClause(clause.Condition, clause.Statements));
+        }
+
         var elseStatements = elseClause?.Statements ?? Array.Empty<Statement>();
-        return new CompoundStatement(new IfStatement(condition, thenSuite.Statements, elseStatements));
+        return new CompoundStatement(new IfStatement(clauses, elseStatements));
+    }
+
+    [Rule]
+    public ElifClause ElifClause(
+        [T(Token.Elif)] Token keyword,
+        [NT] Expression condition,
+        [T(Token.Colon)] Token colon,
+        [NT] Suite suite)
+    {
+        return new ElifClause(condition, suite.Statements);
     }
 
     [Rule]
@@ -96,6 +141,34 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     {
         return new ElseClause(suite.Statements);
     }
+
+    [Rule]
+    public CompoundStatement ForStatement(
+        [T(Token.For)] Token keyword,
+        [T(Token.Id)] string name,
+        [T(Token.In)] Token inKeyword,
+        [NT] Expression iterable,
+        [T(Token.Colon)] Token colon,
+        [NT] Suite suite)
+    {
+        return new CompoundStatement(new ForStatement(name, iterable, suite.Statements));
+    }
+
+    [Rule]
+    public CompoundStatement FunctionDefinition(
+        [T(Token.Def)] Token keyword,
+        [T(Token.Id)] string name,
+        [T(Token.OpenParen)] Token openParen,
+        [L(Sep = Token.Comma)] string[] parameters,
+        [T(Token.CloseParen)] Token closeParen,
+        [T(Token.Colon)] Token colon,
+        [NT] Suite suite)
+    {
+        return new CompoundStatement(new FunctionDefinitionStatement(name, parameters, suite.Statements));
+    }
+
+    [Rule]
+    public string ParameterName([T(Token.Id)] string name) => name;
 
     [Rule]
     public Suite SingleLineSuite([NT] SimpleStatement statement)
@@ -128,6 +201,8 @@ public readonly record struct ModuleRoot(StarlarkModule Module);
 public readonly record struct StatementLine(Statement? Statement);
 
 public readonly record struct Suite(IReadOnlyList<Statement> Statements);
+
+public readonly record struct ElifClause(Expression Condition, IReadOnlyList<Statement> Statements);
 
 public readonly record struct ElseClause(IReadOnlyList<Statement> Statements);
 

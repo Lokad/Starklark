@@ -22,6 +22,15 @@ public enum Token
     [Any("in"), F(Id, true)] In,
     [Any("True"), F(Id, true)] True,
     [Any("False"), F(Id, true)] False,
+    [Any("def"), F(Id, true)] Def,
+    [Any("for"), F(Id, true)] For,
+    [Any("if"), F(Id, true)] If,
+    [Any("elif"), F(Id, true)] Elif,
+    [Any("else"), F(Id, true)] Else,
+    [Any("return"), F(Id, true)] Return,
+    [Any("break"), F(Id, true)] Break,
+    [Any("continue"), F(Id, true)] Continue,
+    [Any("pass"), F(Id, true)] Pass,
 
     [Any("==")] Equal,
     [Any("!=")] NotEqual,
@@ -47,8 +56,6 @@ public enum Token
     [Pattern("[A-Za-z_][A-Za-z0-9_]*")]
     Id,
 
-    [Any("if"), F(Id, true)] If,
-    [Any("else"), F(Id, true)] Else,
     [Any("None"), F(Id, true)] None,
 
     [Pattern("[0-9]+(\\.[0-9]+)?", Start = "0123456789")]

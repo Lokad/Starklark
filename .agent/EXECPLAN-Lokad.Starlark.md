@@ -12,8 +12,8 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 
 - [x] (2026-01-02 21:30Z) Captured initial constraints, targets, and test suite scope for Lokad.Starlark.
 - [x] (2026-01-02 21:45Z) Scaffolded `Lokad.Starlark.slnx`, core library project, and test project with multi-targeting.
-- [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser + basic module statements + if blocks + list/tuple/dict literals + indexing + in/comparison operators + string escape handling; remaining: full Starlark grammar and statement parsing).
-- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + expression evaluator + function calls + module execution; remaining: full value model and builtins).
+- [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser + basic module statements + if/elif blocks + for loops + function definitions + return/break/continue/pass + list/tuple/dict literals + indexing + in/comparison operators + string escape handling; remaining: full Starlark grammar and statement parsing).
+- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + expression evaluator + function calls + module execution + function bodies + loops; remaining: full value model and builtins).
 - [ ] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
 - [ ] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness.
 - [ ] Extend test suite with non-redundant cases from `java`/`rust` when they cover distinct semantics.
@@ -179,3 +179,4 @@ Plan revisions:
 - Noted parser/runtime progress after adding `in` operator.
 - Noted parser/runtime progress after adding comparison operators.
 - Noted parser progress after adding string escape handling.
+- Noted parser/runtime progress after adding for loops, function definitions, and control flow statements.

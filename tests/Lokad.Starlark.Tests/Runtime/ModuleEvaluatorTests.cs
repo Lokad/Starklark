@@ -29,4 +29,27 @@ public sealed class ModuleEvaluatorTests
         Assert.Equal(new StarlarkInt(5), environment.Globals["x"]);
         Assert.Equal(new StarlarkInt(5), result);
     }
+
+    [Fact]
+    public void ExecutesForStatement()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("total = 0\nfor x in [1, 2, 3]:\n  total = total + x\ntotal\n", environment);
+
+        Assert.Equal(new StarlarkInt(6), environment.Globals["total"]);
+        Assert.Equal(new StarlarkInt(6), result);
+    }
+
+    [Fact]
+    public void ExecutesFunctionDefinition()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("def add(a, b):\n  return a + b\nadd(2, 3)\n", environment);
+
+        Assert.Equal(new StarlarkInt(5), result);
+    }
 }

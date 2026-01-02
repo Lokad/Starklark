@@ -62,13 +62,44 @@ public sealed record StarlarkNone : StarlarkValue
     public override bool IsTruthy => false;
 }
 
+public abstract record StarlarkCallable : StarlarkValue
+{
+    public abstract StarlarkValue Call(IReadOnlyList<StarlarkValue> args);
+
+    public override string TypeName => "function";
+    public override bool IsTruthy => true;
+}
+
 public sealed record StarlarkFunction(
     string Name,
     Func<IReadOnlyList<StarlarkValue>, StarlarkValue> Invoke)
-    : StarlarkValue
+    : StarlarkCallable
 {
-    public override string TypeName => "function";
-    public override bool IsTruthy => true;
+    public override StarlarkValue Call(IReadOnlyList<StarlarkValue> args) => Invoke(args);
+}
 
-    public StarlarkValue Call(IReadOnlyList<StarlarkValue> args) => Invoke(args);
+public sealed record StarlarkUserFunction(
+    string Name,
+    IReadOnlyList<string> Parameters,
+    IReadOnlyList<Lokad.Starlark.Syntax.Statement> Body,
+    StarlarkEnvironment Closure)
+    : StarlarkCallable
+{
+    public override StarlarkValue Call(IReadOnlyList<StarlarkValue> args)
+    {
+        if (args.Count != Parameters.Count)
+        {
+            throw new InvalidOperationException(
+                $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count}.");
+        }
+
+        var callEnvironment = Closure.CreateChild();
+        for (var i = 0; i < Parameters.Count; i++)
+        {
+            callEnvironment.Set(Parameters[i], args[i]);
+        }
+
+        var evaluator = new ModuleEvaluator();
+        return evaluator.ExecuteFunctionBody(Body, callEnvironment);
+    }
 }
