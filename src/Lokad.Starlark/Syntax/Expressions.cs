@@ -22,6 +22,8 @@ public sealed record DictExpression(IReadOnlyList<DictEntry> Entries) : Expressi
 
 public sealed record DictEntry(Expression Key, Expression Value);
 
+public sealed record IndexExpression(Expression Target, Expression Index) : Expression;
+
 public enum UnaryOperator
 {
     Negate,

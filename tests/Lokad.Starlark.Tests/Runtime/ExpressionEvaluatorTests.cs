@@ -101,4 +101,14 @@ public sealed class ExpressionEvaluatorTests
                 Assert.Equal(new StarlarkInt(2), entry.Value);
             });
     }
+
+    [Fact]
+    public void EvaluatesIndexExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("[1, 2][0]");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkInt(1), result);
+    }
 }

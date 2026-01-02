@@ -105,6 +105,16 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new DictExpression(entries);
     }
 
+    [Rule]
+    public Expression Index(
+        [NT(0)] Expression target,
+        [T(Token.OpenBracket)] Token open,
+        [NT] Expression index,
+        [T(Token.CloseBracket)] Token close)
+    {
+        return new IndexExpression(target, index);
+    }
+
     [Rule(Rank = 1)]
     public Expression Unary(
         [T(Token.Minus, Token.Not)] Token op,

@@ -16,6 +16,7 @@ public sealed class ExpressionEvaluator
             ListExpression list => EvaluateList(list, environment),
             TupleExpression tuple => EvaluateTuple(tuple, environment),
             DictExpression dict => EvaluateDict(dict, environment),
+            IndexExpression index => EvaluateIndex(index, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
     }
@@ -150,6 +151,78 @@ public sealed class ExpressionEvaluator
         }
 
         return new StarlarkDict(entries);
+    }
+
+    private StarlarkValue EvaluateIndex(IndexExpression index, StarlarkEnvironment environment)
+    {
+        var target = Evaluate(index.Target, environment);
+        var key = Evaluate(index.Index, environment);
+
+        return target switch
+        {
+            StarlarkList list => IndexList(list, key),
+            StarlarkTuple tuple => IndexTuple(tuple, key),
+            StarlarkString text => IndexString(text, key),
+            StarlarkDict dict => IndexDict(dict, key),
+            _ => throw new InvalidOperationException(
+                $"Indexing not supported for type '{target.TypeName}'.")
+        };
+    }
+
+    private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, list.Items.Count);
+        return list.Items[resolved];
+    }
+
+    private static StarlarkValue IndexTuple(StarlarkTuple tuple, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, tuple.Items.Count);
+        return tuple.Items[resolved];
+    }
+
+    private static StarlarkValue IndexString(StarlarkString text, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, text.Value.Length);
+        return new StarlarkString(text.Value[resolved].ToString());
+    }
+
+    private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
+    {
+        foreach (var entry in dict.Entries)
+        {
+            if (Equals(entry.Key, key))
+            {
+                return entry.Value;
+            }
+        }
+
+        throw new KeyNotFoundException("Key not found in dict.");
+    }
+
+    private static int RequireIndex(StarlarkValue index)
+    {
+        if (index is StarlarkInt intValue)
+        {
+            return checked((int)intValue.Value);
+        }
+
+        throw new InvalidOperationException(
+            $"Index must be an int, got '{index.TypeName}'.");
+    }
+
+    private static int ResolveIndex(int position, int length)
+    {
+        var resolved = position < 0 ? length + position : position;
+        if (resolved < 0 || resolved >= length)
+        {
+            throw new IndexOutOfRangeException("Index out of range.");
+        }
+
+        return resolved;
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)

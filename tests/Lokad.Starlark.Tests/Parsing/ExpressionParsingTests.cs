@@ -95,4 +95,14 @@ public sealed class ExpressionParsingTests
                 Assert.Equal(new LiteralExpression(2L), entry.Value);
             });
     }
+
+    [Fact]
+    public void ParsesIndexExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("items[0]");
+
+        var index = Assert.IsType<IndexExpression>(expr);
+        Assert.Equal(new IdentifierExpression("items"), index.Target);
+        Assert.Equal(new LiteralExpression(0L), index.Index);
+    }
 }
