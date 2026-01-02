@@ -133,7 +133,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public InfixRight AndThen(
-        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.Equal, Token.NotEqual, Token.In, Token.And, Token.Or)] Token op,
+        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.And, Token.Or)] Token op,
         [NT(1)] Expression right)
     {
         return new InfixRight
@@ -147,6 +147,10 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 Token.Equal => BinaryOperator.Equal,
                 Token.NotEqual => BinaryOperator.NotEqual,
                 Token.In => BinaryOperator.In,
+                Token.Less => BinaryOperator.Less,
+                Token.LessEqual => BinaryOperator.LessEqual,
+                Token.Greater => BinaryOperator.Greater,
+                Token.GreaterEqual => BinaryOperator.GreaterEqual,
                 Token.And => BinaryOperator.And,
                 Token.Or => BinaryOperator.Or,
                 _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)

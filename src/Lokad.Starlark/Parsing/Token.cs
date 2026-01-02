@@ -25,6 +25,10 @@ public enum Token
 
     [Any("==")] Equal,
     [Any("!=")] NotEqual,
+    [Any("<=")] LessEqual,
+    [Any(">=")] GreaterEqual,
+    [Any("<")] Less,
+    [Any(">")] Greater,
     [Any("=")] Assign,
     [Any("+")] Plus,
     [Any("-")] Minus,

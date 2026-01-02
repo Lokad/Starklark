@@ -114,4 +114,13 @@ public sealed class ExpressionParsingTests
         var binary = Assert.IsType<BinaryExpression>(expr);
         Assert.Equal(BinaryOperator.In, binary.Operator);
     }
+
+    [Fact]
+    public void ParsesComparisonExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("1 < 2");
+
+        var binary = Assert.IsType<BinaryExpression>(expr);
+        Assert.Equal(BinaryOperator.Less, binary.Operator);
+    }
 }

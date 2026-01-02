@@ -39,6 +39,10 @@ public enum BinaryOperator
     Equal,
     NotEqual,
     In,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
     And,
     Or
 }
@@ -58,6 +62,10 @@ public static class BinaryOperatorExtensions
             BinaryOperator.Equal => 1,
             BinaryOperator.NotEqual => 1,
             BinaryOperator.In => 1,
+            BinaryOperator.Less => 1,
+            BinaryOperator.LessEqual => 1,
+            BinaryOperator.Greater => 1,
+            BinaryOperator.GreaterEqual => 1,
             BinaryOperator.And => 0,
             BinaryOperator.Or => 0,
             _ => 0

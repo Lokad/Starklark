@@ -121,4 +121,14 @@ public sealed class ExpressionEvaluatorTests
 
         Assert.Equal(new StarlarkBool(true), result);
     }
+
+    [Fact]
+    public void EvaluatesComparisonExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("2 >= 2");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkBool(true), result);
+    }
 }

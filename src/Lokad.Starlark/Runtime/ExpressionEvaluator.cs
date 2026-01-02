@@ -99,6 +99,10 @@ public sealed class ExpressionEvaluator
             BinaryOperator.Equal => new StarlarkBool(Equals(leftValue, rightValue)),
             BinaryOperator.NotEqual => new StarlarkBool(!Equals(leftValue, rightValue)),
             BinaryOperator.In => new StarlarkBool(IsIn(leftValue, rightValue)),
+            BinaryOperator.Less => new StarlarkBool(Compare(leftValue, rightValue) < 0),
+            BinaryOperator.LessEqual => new StarlarkBool(Compare(leftValue, rightValue) <= 0),
+            BinaryOperator.Greater => new StarlarkBool(Compare(leftValue, rightValue) > 0),
+            BinaryOperator.GreaterEqual => new StarlarkBool(Compare(leftValue, rightValue) >= 0),
             _ => throw new ArgumentOutOfRangeException(nameof(binary.Operator), binary.Operator, null)
         };
     }
@@ -254,6 +258,23 @@ public sealed class ExpressionEvaluator
         }
 
         return false;
+    }
+
+    private static int Compare(StarlarkValue left, StarlarkValue right)
+    {
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            return leftNumber.CompareTo(rightNumber);
+        }
+
+        if (left is StarlarkString leftString && right is StarlarkString rightString)
+        {
+            return string.Compare(leftString.Value, rightString.Value, StringComparison.Ordinal);
+        }
+
+        throw new InvalidOperationException(
+            $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)
