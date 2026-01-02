@@ -32,7 +32,7 @@ public sealed class ExpressionEvaluatorTests
     {
         var expr = StarlarkParser.ParseExpression("add(1, 2)");
         var environment = new StarlarkEnvironment();
-        environment.Globals["add"] = new StarlarkFunction(
+        environment.AddFunction(
             "add",
             args => new StarlarkInt(((StarlarkInt)args[0]).Value + ((StarlarkInt)args[1]).Value));
 
