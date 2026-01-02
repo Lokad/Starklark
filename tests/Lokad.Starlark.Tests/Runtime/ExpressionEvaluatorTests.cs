@@ -26,4 +26,19 @@ public sealed class ExpressionEvaluatorTests
 
         Assert.Equal(new StarlarkFloat(0.5), result);
     }
+
+    [Fact]
+    public void EvaluatesFunctionCall()
+    {
+        var expr = StarlarkParser.ParseExpression("add(1, 2)");
+        var environment = new StarlarkEnvironment();
+        environment.Globals["add"] = new StarlarkFunction(
+            "add",
+            args => new StarlarkInt(((StarlarkInt)args[0]).Value + ((StarlarkInt)args[1]).Value));
+
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, environment);
+
+        Assert.Equal(new StarlarkInt(3), result);
+    }
 }

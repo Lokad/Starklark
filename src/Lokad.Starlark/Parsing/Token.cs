@@ -29,6 +29,7 @@ public enum Token
 
     [Any("(")] OpenParen,
     [Any(")")] CloseParen,
+    [Any(",")] Comma,
 
     [Pattern("[A-Za-z_][A-Za-z0-9_]*")]
     Id,

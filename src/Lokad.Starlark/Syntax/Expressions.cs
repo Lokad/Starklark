@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Lokad.Starlark.Syntax;
 
 public abstract record Expression;
@@ -9,6 +11,8 @@ public sealed record IdentifierExpression(string Name) : Expression;
 public sealed record UnaryExpression(UnaryOperator Operator, Expression Operand) : Expression;
 
 public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, Expression Right) : Expression;
+
+public sealed record CallExpression(Expression Callee, IReadOnlyList<Expression> Arguments) : Expression;
 
 public enum UnaryOperator
 {

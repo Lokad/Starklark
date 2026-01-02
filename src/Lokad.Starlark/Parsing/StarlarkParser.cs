@@ -84,6 +84,16 @@ public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expres
         return inner;
     }
 
+    [Rule]
+    public Expression Call(
+        [NT(0)] Expression callee,
+        [T(Token.OpenParen)] Token open,
+        [L(Sep = Token.Comma)] Expression[] args,
+        [T(Token.CloseParen)] Token close)
+    {
+        return new CallExpression(callee, args);
+    }
+
     [Rule(Rank = 1)]
     public Expression Unary(
         [T(Token.Minus, Token.Not)] Token op,
@@ -193,6 +203,18 @@ public class TAttribute : TerminalAttribute
 public class LAttribute : ListAttribute
 {
     public LAttribute(int maxRank = -1) : base(maxRank) { }
+
+    public Token Sep
+    {
+        get => (Token)(Separator ?? 0);
+        set => Separator = (int)value;
+    }
+
+    public Token End
+    {
+        get => (Token)(Terminator ?? 0);
+        set => Terminator = (int)value;
+    }
 }
 
 public class NTAttribute : NonTerminalAttribute

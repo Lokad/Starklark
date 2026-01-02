@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Lokad.Starlark.Runtime;
 
 public abstract record StarlarkValue
@@ -28,4 +31,15 @@ public sealed record StarlarkString(string Value) : StarlarkValue
 {
     public override string TypeName => "string";
     public override bool IsTruthy => Value.Length != 0;
+}
+
+public sealed record StarlarkFunction(
+    string Name,
+    Func<IReadOnlyList<StarlarkValue>, StarlarkValue> Invoke)
+    : StarlarkValue
+{
+    public override string TypeName => "function";
+    public override bool IsTruthy => true;
+
+    public StarlarkValue Call(IReadOnlyList<StarlarkValue> args) => Invoke(args);
 }

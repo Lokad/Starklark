@@ -13,7 +13,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-02 21:30Z) Captured initial constraints, targets, and test suite scope for Lokad.Starlark.
 - [x] (2026-01-02 21:45Z) Scaffolded `Lokad.Starlark.slnx`, core library project, and test project with multi-targeting.
 - [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser skeleton; remaining: full Starlark grammar and statement parsing).
-- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + expression evaluator; remaining: full value model and builtins).
+- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + expression evaluator + function calls; remaining: full value model and builtins).
 - [ ] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
 - [ ] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness.
 - [ ] Extend test suite with non-redundant cases from `java`/`rust` when they cover distinct semantics.
@@ -168,3 +168,4 @@ Plan revisions:
 - Recorded `dotnet test` failure when targeting `.slnx`.
 - Noted partial completion for runtime values after adding expression evaluation support.
 - Recorded that `dotnet test` requires absolute project paths in this environment.
+- Noted partial completion for runtime values after adding function call support.

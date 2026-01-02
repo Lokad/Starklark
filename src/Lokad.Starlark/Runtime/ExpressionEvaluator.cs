@@ -12,6 +12,7 @@ public sealed class ExpressionEvaluator
             IdentifierExpression identifier => ResolveIdentifier(identifier, environment),
             UnaryExpression unary => EvaluateUnary(unary, environment),
             BinaryExpression binary => EvaluateBinary(binary, environment),
+            CallExpression call => EvaluateCall(call, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
     }
@@ -91,6 +92,24 @@ public sealed class ExpressionEvaluator
             BinaryOperator.NotEqual => new StarlarkBool(!Equals(leftValue, rightValue)),
             _ => throw new ArgumentOutOfRangeException(nameof(binary.Operator), binary.Operator, null)
         };
+    }
+
+    private StarlarkValue EvaluateCall(CallExpression call, StarlarkEnvironment environment)
+    {
+        var callee = Evaluate(call.Callee, environment);
+        if (callee is not StarlarkFunction function)
+        {
+            throw new InvalidOperationException(
+                $"Attempted to call non-callable value of type '{callee.TypeName}'.");
+        }
+
+        var args = new StarlarkValue[call.Arguments.Count];
+        for (var i = 0; i < call.Arguments.Count; i++)
+        {
+            args[i] = Evaluate(call.Arguments[i], environment);
+        }
+
+        return function.Call(args);
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)
