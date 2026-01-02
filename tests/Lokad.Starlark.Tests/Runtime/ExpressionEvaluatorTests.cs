@@ -177,6 +177,27 @@ public sealed class ExpressionEvaluatorTests
     }
 
     [Fact]
+    public void EvaluatesListConcatenation()
+    {
+        var expr = StarlarkParser.ParseExpression("[1] + [2, 3]");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        var list = Assert.IsType<StarlarkList>(result);
+        Assert.Equal(3, list.Items.Count);
+    }
+
+    [Fact]
+    public void EvaluatesStringRepetition()
+    {
+        var expr = StarlarkParser.ParseExpression("\"ab\" * 2");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkString("abab"), result);
+    }
+
+    [Fact]
     public void EvaluatesConditionalExpression()
     {
         var expr = StarlarkParser.ParseExpression("1 if True else 0");

@@ -296,6 +296,19 @@ public sealed class ExpressionEvaluator
             return new StarlarkString(leftString.Value + rightString.Value);
         }
 
+        if (left is StarlarkList leftList && right is StarlarkList rightList)
+        {
+            var items = new List<StarlarkValue>(leftList.Items.Count + rightList.Items.Count);
+            items.AddRange(leftList.Items);
+            items.AddRange(rightList.Items);
+            return new StarlarkList(items);
+        }
+
+        if (left is StarlarkTuple leftTuple && right is StarlarkTuple rightTuple)
+        {
+            return new StarlarkTuple(leftTuple.Items.Concat(rightTuple.Items).ToArray());
+        }
+
         if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
             return new StarlarkInt(leftInt.Value + rightInt.Value);
@@ -339,6 +352,36 @@ public sealed class ExpressionEvaluator
             return new StarlarkInt(leftInt.Value * rightInt.Value);
         }
 
+        if (left is StarlarkString leftString && right is StarlarkInt rightCount)
+        {
+            return new StarlarkString(RepeatString(leftString.Value, rightCount.Value));
+        }
+
+        if (left is StarlarkInt leftCount && right is StarlarkString rightString)
+        {
+            return new StarlarkString(RepeatString(rightString.Value, leftCount.Value));
+        }
+
+        if (left is StarlarkList leftList && right is StarlarkInt listCount)
+        {
+            return new StarlarkList(RepeatList(leftList.Items, listCount.Value));
+        }
+
+        if (left is StarlarkInt listCountLeft && right is StarlarkList rightList)
+        {
+            return new StarlarkList(RepeatList(rightList.Items, listCountLeft.Value));
+        }
+
+        if (left is StarlarkTuple leftTuple && right is StarlarkInt tupleCount)
+        {
+            return new StarlarkTuple(RepeatList(leftTuple.Items, tupleCount.Value));
+        }
+
+        if (left is StarlarkInt tupleCountLeft && right is StarlarkTuple rightTuple)
+        {
+            return new StarlarkTuple(RepeatList(rightTuple.Items, tupleCountLeft.Value));
+        }
+
         if (TryGetNumber(left, out var leftNumber, out var leftIsInt)
             && TryGetNumber(right, out var rightNumber, out var rightIsInt))
         {
@@ -349,6 +392,49 @@ public sealed class ExpressionEvaluator
 
         throw new InvalidOperationException(
             $"Operator '*' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static string RepeatString(string value, long count)
+    {
+        if (count <= 0)
+        {
+            return string.Empty;
+        }
+
+        if (count > int.MaxValue)
+        {
+            throw new InvalidOperationException("Repeat count is too large.");
+        }
+
+        var builder = new System.Text.StringBuilder(value.Length * (int)count);
+        for (var i = 0; i < count; i++)
+        {
+            builder.Append(value);
+        }
+
+        return builder.ToString();
+    }
+
+    private static List<StarlarkValue> RepeatList(IReadOnlyList<StarlarkValue> items, long count)
+    {
+        if (count <= 0)
+        {
+            return new List<StarlarkValue>();
+        }
+
+        if (count > int.MaxValue)
+        {
+            throw new InvalidOperationException("Repeat count is too large.");
+        }
+
+        var total = checked(items.Count * (int)count);
+        var result = new List<StarlarkValue>(total);
+        for (var i = 0; i < count; i++)
+        {
+            result.AddRange(items);
+        }
+
+        return result;
     }
 
     private static StarlarkValue Divide(StarlarkValue left, StarlarkValue right)

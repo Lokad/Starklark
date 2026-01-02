@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Lokad.Starlark.Syntax;
 
 namespace Lokad.Starlark.Runtime;
@@ -59,6 +60,10 @@ public sealed class ModuleEvaluator
                 case AssignmentStatement assignment:
                     var value = _expressionEvaluator.Evaluate(assignment.Value, environment);
                     AssignTarget(assignment.Target, value, environment);
+                    lastValue = null;
+                    break;
+                case AugmentedAssignmentStatement augmentedAssignment:
+                    ExecuteAugmentedAssignment(augmentedAssignment, environment);
                     lastValue = null;
                     break;
                 case ExpressionStatement expressionStatement:
@@ -183,6 +188,422 @@ public sealed class ModuleEvaluator
                     $"Unsupported assignment target '{target.GetType().Name}'.");
         }
     }
+
+    private void ExecuteAugmentedAssignment(AugmentedAssignmentStatement assignment, StarlarkEnvironment environment)
+    {
+        switch (assignment.Target)
+        {
+            case NameTarget nameTarget:
+                ExecuteAugmentedNameAssignment(nameTarget, assignment, environment);
+                break;
+            case IndexTarget indexTarget:
+                ExecuteAugmentedIndexAssignment(indexTarget, assignment, environment);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Augmented assignment not supported for '{assignment.Target.GetType().Name}'.");
+        }
+    }
+
+    private void ExecuteAugmentedNameAssignment(
+        NameTarget target,
+        AugmentedAssignmentStatement assignment,
+        StarlarkEnvironment environment)
+    {
+        if (!environment.TryGet(target.Name, out var existing))
+        {
+            throw new KeyNotFoundException($"Undefined identifier '{target.Name}'.");
+        }
+
+        var right = _expressionEvaluator.Evaluate(assignment.Value, environment);
+        if (existing is StarlarkList list && assignment.Operator == BinaryOperator.Add)
+        {
+            AppendList(list, right);
+            environment.Set(target.Name, list);
+            return;
+        }
+
+        var result = ApplyBinaryOperator(assignment.Operator, existing, right);
+        environment.Set(target.Name, result);
+    }
+
+    private void ExecuteAugmentedIndexAssignment(
+        IndexTarget target,
+        AugmentedAssignmentStatement assignment,
+        StarlarkEnvironment environment)
+    {
+        var container = _expressionEvaluator.Evaluate(target.Target, environment);
+        var index = _expressionEvaluator.Evaluate(target.Index, environment);
+        var existing = GetIndexedValue(container, index);
+        var right = _expressionEvaluator.Evaluate(assignment.Value, environment);
+        var result = ApplyBinaryOperator(assignment.Operator, existing, right);
+
+        switch (container)
+        {
+            case StarlarkList list:
+                AssignListIndex(list, index, result);
+                break;
+            case StarlarkDict dict:
+                AssignDictIndex(dict, index, result);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Index assignment not supported for '{container.TypeName}'.");
+        }
+    }
+
+    private static void AppendList(StarlarkList list, StarlarkValue value)
+    {
+        switch (value)
+        {
+            case StarlarkList rightList:
+                list.Items.AddRange(rightList.Items);
+                break;
+            case StarlarkTuple rightTuple:
+                list.Items.AddRange(rightTuple.Items);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Operator '+=' not supported for '{list.TypeName}' and '{value.TypeName}'.");
+        }
+    }
+
+    private static StarlarkValue GetIndexedValue(StarlarkValue container, StarlarkValue index)
+    {
+        return container switch
+        {
+            StarlarkList list => IndexList(list, index),
+            StarlarkTuple tuple => IndexTuple(tuple, index),
+            StarlarkString text => IndexString(text, index),
+            StarlarkDict dict => IndexDict(dict, index),
+            _ => throw new InvalidOperationException(
+                $"Indexing not supported for '{container.TypeName}'.")
+        };
+    }
+
+    private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, list.Items.Count);
+        return list.Items[resolved];
+    }
+
+    private static StarlarkValue IndexTuple(StarlarkTuple tuple, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, tuple.Items.Count);
+        return tuple.Items[resolved];
+    }
+
+    private static StarlarkValue IndexString(StarlarkString text, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, text.Value.Length);
+        return new StarlarkString(text.Value[resolved].ToString());
+    }
+
+    private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
+    {
+        foreach (var entry in dict.Entries)
+        {
+            if (Equals(entry.Key, key))
+            {
+                return entry.Value;
+            }
+        }
+
+        throw new KeyNotFoundException("Key not found in dict.");
+    }
+
+    private static int RequireIndex(StarlarkValue index)
+    {
+        if (index is StarlarkInt intValue)
+        {
+            return checked((int)intValue.Value);
+        }
+
+        throw new InvalidOperationException(
+            $"Index must be an int, got '{index.TypeName}'.");
+    }
+
+    private static int ResolveIndex(int position, int length)
+    {
+        var resolved = position < 0 ? length + position : position;
+        if (resolved < 0 || resolved >= length)
+        {
+            throw new IndexOutOfRangeException("Index out of range.");
+        }
+
+        return resolved;
+    }
+
+    private static StarlarkValue ApplyBinaryOperator(
+        BinaryOperator op,
+        StarlarkValue left,
+        StarlarkValue right)
+    {
+        return op switch
+        {
+            BinaryOperator.Add => Add(left, right),
+            BinaryOperator.Subtract => Subtract(left, right),
+            BinaryOperator.Multiply => Multiply(left, right),
+            BinaryOperator.Divide => Divide(left, right),
+            BinaryOperator.FloorDivide => FloorDivide(left, right),
+            BinaryOperator.Modulo => Modulo(left, right),
+            _ => throw new InvalidOperationException(
+                $"Operator '{op}' not supported for augmented assignment.")
+        };
+    }
+
+    private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkString leftString && right is StarlarkString rightString)
+        {
+            return new StarlarkString(leftString.Value + rightString.Value);
+        }
+
+        if (left is StarlarkList leftList && right is StarlarkList rightList)
+        {
+            var items = new List<StarlarkValue>(leftList.Items.Count + rightList.Items.Count);
+            items.AddRange(leftList.Items);
+            items.AddRange(rightList.Items);
+            return new StarlarkList(items);
+        }
+
+        if (left is StarlarkTuple leftTuple && right is StarlarkTuple rightTuple)
+        {
+            return new StarlarkTuple(leftTuple.Items.Concat(rightTuple.Items).ToArray());
+        }
+
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value + rightInt.Value);
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out var leftIsInt)
+            && TryGetNumber(right, out var rightNumber, out var rightIsInt))
+        {
+            return leftIsInt && rightIsInt
+                ? new StarlarkInt((long)(leftNumber + rightNumber))
+                : new StarlarkFloat(leftNumber + rightNumber);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '+' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue Subtract(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value - rightInt.Value);
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out var leftIsInt)
+            && TryGetNumber(right, out var rightNumber, out var rightIsInt))
+        {
+            return leftIsInt && rightIsInt
+                ? new StarlarkInt((long)(leftNumber - rightNumber))
+                : new StarlarkFloat(leftNumber - rightNumber);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '-' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue Multiply(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value * rightInt.Value);
+        }
+
+        if (left is StarlarkString leftString && right is StarlarkInt rightCount)
+        {
+            return new StarlarkString(RepeatString(leftString.Value, rightCount.Value));
+        }
+
+        if (left is StarlarkInt leftCount && right is StarlarkString rightString)
+        {
+            return new StarlarkString(RepeatString(rightString.Value, leftCount.Value));
+        }
+
+        if (left is StarlarkList leftList && right is StarlarkInt listCount)
+        {
+            return new StarlarkList(RepeatList(leftList.Items, listCount.Value));
+        }
+
+        if (left is StarlarkInt listCountLeft && right is StarlarkList rightList)
+        {
+            return new StarlarkList(RepeatList(rightList.Items, listCountLeft.Value));
+        }
+
+        if (left is StarlarkTuple leftTuple && right is StarlarkInt tupleCount)
+        {
+            return new StarlarkTuple(RepeatList(leftTuple.Items, tupleCount.Value));
+        }
+
+        if (left is StarlarkInt tupleCountLeft && right is StarlarkTuple rightTuple)
+        {
+            return new StarlarkTuple(RepeatList(rightTuple.Items, tupleCountLeft.Value));
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out var leftIsInt)
+            && TryGetNumber(right, out var rightNumber, out var rightIsInt))
+        {
+            return leftIsInt && rightIsInt
+                ? new StarlarkInt((long)(leftNumber * rightNumber))
+                : new StarlarkFloat(leftNumber * rightNumber);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '*' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue Divide(StarlarkValue left, StarlarkValue right)
+    {
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            return new StarlarkFloat(leftNumber / rightNumber);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '/' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue FloorDivide(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            var quotient = leftInt.Value / rightInt.Value;
+            var remainder = leftInt.Value % rightInt.Value;
+            if (remainder != 0 && ((leftInt.Value < 0) ^ (rightInt.Value < 0)))
+            {
+                quotient -= 1;
+            }
+
+            return new StarlarkInt(quotient);
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            if (rightNumber == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            return new StarlarkFloat(Math.Floor(leftNumber / rightNumber));
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '//' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue Modulo(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            var quotient = leftInt.Value / rightInt.Value;
+            var remainder = leftInt.Value % rightInt.Value;
+            if (remainder != 0 && ((leftInt.Value < 0) ^ (rightInt.Value < 0)))
+            {
+                quotient -= 1;
+            }
+
+            var result = leftInt.Value - quotient * rightInt.Value;
+            return new StarlarkInt(result);
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            if (rightNumber == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            var quotient = Math.Floor(leftNumber / rightNumber);
+            return new StarlarkFloat(leftNumber - quotient * rightNumber);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
+    {
+        switch (value)
+        {
+            case StarlarkInt intValue:
+                number = intValue.Value;
+                isInt = true;
+                return true;
+            case StarlarkFloat floatValue:
+                number = floatValue.Value;
+                isInt = false;
+                return true;
+            default:
+                number = 0;
+                isInt = false;
+                return false;
+        }
+    }
+
+    private static string RepeatString(string value, long count)
+    {
+        if (count <= 0)
+        {
+            return string.Empty;
+        }
+
+        if (count > int.MaxValue)
+        {
+            throw new InvalidOperationException("Repeat count is too large.");
+        }
+
+        var builder = new System.Text.StringBuilder(value.Length * (int)count);
+        for (var i = 0; i < count; i++)
+        {
+            builder.Append(value);
+        }
+
+        return builder.ToString();
+    }
+
+    private static List<StarlarkValue> RepeatList(IReadOnlyList<StarlarkValue> items, long count)
+    {
+        if (count <= 0)
+        {
+            return new List<StarlarkValue>();
+        }
+
+        if (count > int.MaxValue)
+        {
+            throw new InvalidOperationException("Repeat count is too large.");
+        }
+
+        var total = checked(items.Count * (int)count);
+        var result = new List<StarlarkValue>(total);
+        for (var i = 0; i < count; i++)
+        {
+            result.AddRange(items);
+        }
+
+        return result;
+    }
+
 
     private void AssignIndexTarget(IndexTarget target, StarlarkValue value, StarlarkEnvironment environment)
     {

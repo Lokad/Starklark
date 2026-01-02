@@ -18,6 +18,11 @@ public sealed record TupleTarget(IReadOnlyList<AssignmentTarget> Items) : Assign
 
 public sealed record ListTarget(IReadOnlyList<AssignmentTarget> Items) : AssignmentTarget;
 
+public sealed record AugmentedAssignmentStatement(
+    AssignmentTarget Target,
+    BinaryOperator Operator,
+    Expression Value) : Statement;
+
 public sealed record IfClause(Expression Condition, IReadOnlyList<Statement> Statements);
 
 public sealed record IfStatement(

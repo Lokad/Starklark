@@ -93,4 +93,26 @@ public sealed class ModuleEvaluatorTests
 
         Assert.Equal(new StarlarkInt(3), result);
     }
+
+    [Fact]
+    public void ExecutesAugmentedAssignment()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("x = 1\nx += 2\nx\n", environment);
+
+        Assert.Equal(new StarlarkInt(3), result);
+    }
+
+    [Fact]
+    public void ExecutesListAugmentedAssignment()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("items = [1]\nitems += [2, 3]\nitems[2]\n", environment);
+
+        Assert.Equal(new StarlarkInt(3), result);
+    }
 }

@@ -71,6 +71,27 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     }
 
     [Rule]
+    public SimpleStatement AugmentedAssignment(
+        [NT] Expression target,
+        [T(Token.PlusAssign, Token.MinusAssign, Token.StarAssign, Token.SlashAssign, Token.FloorDivideAssign, Token.PercentAssign)] Token op,
+        [NT] Expression value)
+    {
+        var operatorValue = op switch
+        {
+            Token.PlusAssign => BinaryOperator.Add,
+            Token.MinusAssign => BinaryOperator.Subtract,
+            Token.StarAssign => BinaryOperator.Multiply,
+            Token.SlashAssign => BinaryOperator.Divide,
+            Token.FloorDivideAssign => BinaryOperator.FloorDivide,
+            Token.PercentAssign => BinaryOperator.Modulo,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
+
+        return new SimpleStatement(
+            new AugmentedAssignmentStatement(ToAssignmentTarget(target), operatorValue, value));
+    }
+
+    [Rule]
     public SimpleStatement ExpressionStatement([NT] Expression expression)
     {
         return new SimpleStatement(new ExpressionStatement(expression));

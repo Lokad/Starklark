@@ -40,6 +40,16 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void ParsesAugmentedAssignment()
+    {
+        var module = StarlarkModuleParser.ParseModule("x += 1\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AugmentedAssignmentStatement>(statement);
+        Assert.Equal(BinaryOperator.Add, assignment.Operator);
+    }
+
+    [Fact]
     public void ParsesExpressionStatement()
     {
         var module = StarlarkModuleParser.ParseModule("1 + 2\n");
