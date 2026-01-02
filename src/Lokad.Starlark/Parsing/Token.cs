@@ -43,7 +43,9 @@ public enum Token
     [Any("+")] Plus,
     [Any("-")] Minus,
     [Any("*")] Star,
+    [Any("//")] FloorDivide,
     [Any("/")] Slash,
+    [Any("%")] Percent,
 
     [Any("(")] OpenParen,
     [Any(")")] CloseParen,

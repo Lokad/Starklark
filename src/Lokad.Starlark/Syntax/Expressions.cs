@@ -24,6 +24,11 @@ public sealed record DictEntry(Expression Key, Expression Value);
 
 public sealed record IndexExpression(Expression Target, Expression Index) : Expression;
 
+public sealed record ConditionalExpression(
+    Expression Condition,
+    Expression ThenExpression,
+    Expression ElseExpression) : Expression;
+
 public enum UnaryOperator
 {
     Negate,
@@ -36,9 +41,12 @@ public enum BinaryOperator
     Subtract,
     Multiply,
     Divide,
+    FloorDivide,
+    Modulo,
     Equal,
     NotEqual,
     In,
+    NotIn,
     Less,
     LessEqual,
     Greater,
@@ -57,11 +65,14 @@ public static class BinaryOperatorExtensions
         {
             BinaryOperator.Multiply => 3,
             BinaryOperator.Divide => 3,
+            BinaryOperator.FloorDivide => 3,
+            BinaryOperator.Modulo => 3,
             BinaryOperator.Add => 2,
             BinaryOperator.Subtract => 2,
             BinaryOperator.Equal => 1,
             BinaryOperator.NotEqual => 1,
             BinaryOperator.In => 1,
+            BinaryOperator.NotIn => 1,
             BinaryOperator.Less => 1,
             BinaryOperator.LessEqual => 1,
             BinaryOperator.Greater => 1,

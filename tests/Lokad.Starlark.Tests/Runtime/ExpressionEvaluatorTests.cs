@@ -131,4 +131,44 @@ public sealed class ExpressionEvaluatorTests
 
         Assert.Equal(new StarlarkBool(true), result);
     }
+
+    [Fact]
+    public void EvaluatesNotInExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("1 not in [2]");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkBool(true), result);
+    }
+
+    [Fact]
+    public void EvaluatesFloorDivideExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("10 // 3");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkInt(3), result);
+    }
+
+    [Fact]
+    public void EvaluatesModuloExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("10 % 3");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkInt(1), result);
+    }
+
+    [Fact]
+    public void EvaluatesConditionalExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("1 if True else 0");
+        var evaluator = new ExpressionEvaluator();
+        var result = evaluator.Evaluate(expr, new StarlarkEnvironment());
+
+        Assert.Equal(new StarlarkInt(1), result);
+    }
 }

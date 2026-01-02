@@ -134,7 +134,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public InfixRight AndThen(
-        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.And, Token.Or)] Token op,
+        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.FloorDivide, Token.Percent, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.And, Token.Or)] Token op,
         [NT(1)] Expression right)
     {
         return new InfixRight
@@ -145,6 +145,8 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 Token.Minus => BinaryOperator.Subtract,
                 Token.Star => BinaryOperator.Multiply,
                 Token.Slash => BinaryOperator.Divide,
+                Token.FloorDivide => BinaryOperator.FloorDivide,
+                Token.Percent => BinaryOperator.Modulo,
                 Token.Equal => BinaryOperator.Equal,
                 Token.NotEqual => BinaryOperator.NotEqual,
                 Token.In => BinaryOperator.In,
@@ -156,6 +158,19 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 Token.Or => BinaryOperator.Or,
                 _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
             },
+            Right = right
+        };
+    }
+
+    [Rule]
+    public InfixRight NotInThen(
+        [T(Token.Not)] Token notKeyword,
+        [T(Token.In)] Token inKeyword,
+        [NT(1)] Expression right)
+    {
+        return new InfixRight
+        {
+            Operator = BinaryOperator.NotIn,
             Right = right
         };
     }
@@ -202,6 +217,17 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         }
 
         return left;
+    }
+
+    [Rule(Rank = 3)]
+    public Expression Conditional(
+        [NT(2)] Expression thenExpression,
+        [T(Token.If)] Token keyword,
+        [NT(2)] Expression condition,
+        [T(Token.Else)] Token elseKeyword,
+        [NT(3)] Expression elseExpression)
+    {
+        return new ConditionalExpression(condition, thenExpression, elseExpression);
     }
 
     [Rule]

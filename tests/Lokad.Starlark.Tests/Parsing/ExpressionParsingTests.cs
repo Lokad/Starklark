@@ -125,6 +125,35 @@ public sealed class ExpressionParsingTests
     }
 
     [Fact]
+    public void ParsesNotInExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("1 not in [2]");
+
+        var binary = Assert.IsType<BinaryExpression>(expr);
+        Assert.Equal(BinaryOperator.NotIn, binary.Operator);
+    }
+
+    [Fact]
+    public void ParsesFloorDivideExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("10 // 3");
+
+        var binary = Assert.IsType<BinaryExpression>(expr);
+        Assert.Equal(BinaryOperator.FloorDivide, binary.Operator);
+    }
+
+    [Fact]
+    public void ParsesConditionalExpression()
+    {
+        var expr = StarlarkParser.ParseExpression("1 if True else 0");
+
+        var conditional = Assert.IsType<ConditionalExpression>(expr);
+        Assert.Equal(new LiteralExpression(true), conditional.Condition);
+        Assert.Equal(new LiteralExpression(1L), conditional.ThenExpression);
+        Assert.Equal(new LiteralExpression(0L), conditional.ElseExpression);
+    }
+
+    [Fact]
     public void ParsesStringEscapes()
     {
         var expr = StarlarkParser.ParseExpression("\"a\\n\\t\"");

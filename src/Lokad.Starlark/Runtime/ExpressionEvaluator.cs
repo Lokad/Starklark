@@ -20,6 +20,7 @@ public sealed class ExpressionEvaluator
             TupleExpression tuple => EvaluateTuple(tuple, environment),
             DictExpression dict => EvaluateDict(dict, environment),
             IndexExpression index => EvaluateIndex(index, environment),
+            ConditionalExpression conditional => EvaluateConditional(conditional, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
     }
@@ -96,15 +97,26 @@ public sealed class ExpressionEvaluator
             BinaryOperator.Subtract => Subtract(leftValue, rightValue),
             BinaryOperator.Multiply => Multiply(leftValue, rightValue),
             BinaryOperator.Divide => Divide(leftValue, rightValue),
+            BinaryOperator.FloorDivide => FloorDivide(leftValue, rightValue),
+            BinaryOperator.Modulo => Modulo(leftValue, rightValue),
             BinaryOperator.Equal => new StarlarkBool(Equals(leftValue, rightValue)),
             BinaryOperator.NotEqual => new StarlarkBool(!Equals(leftValue, rightValue)),
             BinaryOperator.In => new StarlarkBool(IsIn(leftValue, rightValue)),
+            BinaryOperator.NotIn => new StarlarkBool(!IsIn(leftValue, rightValue)),
             BinaryOperator.Less => new StarlarkBool(Compare(leftValue, rightValue) < 0),
             BinaryOperator.LessEqual => new StarlarkBool(Compare(leftValue, rightValue) <= 0),
             BinaryOperator.Greater => new StarlarkBool(Compare(leftValue, rightValue) > 0),
             BinaryOperator.GreaterEqual => new StarlarkBool(Compare(leftValue, rightValue) >= 0),
             _ => throw new ArgumentOutOfRangeException(nameof(binary.Operator), binary.Operator, null)
         };
+    }
+
+    private StarlarkValue EvaluateConditional(ConditionalExpression conditional, StarlarkEnvironment environment)
+    {
+        var condition = Evaluate(conditional.Condition, environment);
+        return condition.IsTruthy
+            ? Evaluate(conditional.ThenExpression, environment)
+            : Evaluate(conditional.ElseExpression, environment);
     }
 
     private StarlarkValue EvaluateCall(CallExpression call, StarlarkEnvironment environment)
@@ -349,6 +361,76 @@ public sealed class ExpressionEvaluator
 
         throw new InvalidOperationException(
             $"Operator '/' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue FloorDivide(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            var quotient = leftInt.Value / rightInt.Value;
+            var remainder = leftInt.Value % rightInt.Value;
+            if (remainder != 0 && ((leftInt.Value < 0) ^ (rightInt.Value < 0)))
+            {
+                quotient -= 1;
+            }
+
+            return new StarlarkInt(quotient);
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            if (rightNumber == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            return new StarlarkFloat(Math.Floor(leftNumber / rightNumber));
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '//' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue Modulo(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            var quotient = leftInt.Value / rightInt.Value;
+            var remainder = leftInt.Value % rightInt.Value;
+            if (remainder != 0 && ((leftInt.Value < 0) ^ (rightInt.Value < 0)))
+            {
+                quotient -= 1;
+            }
+
+            var result = leftInt.Value - quotient * rightInt.Value;
+            return new StarlarkInt(result);
+        }
+
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            if (rightNumber == 0)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            var quotient = Math.Floor(leftNumber / rightNumber);
+            return new StarlarkFloat(leftNumber - quotient * rightNumber);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
     private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
