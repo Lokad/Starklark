@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Lokad.Starlark/Lokad.Starlark.csproj" />
+  <Project Path="tests/Lokad.Starlark.Tests/Lokad.Starlark.Tests.csproj" />
+</Solution>

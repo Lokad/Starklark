@@ -11,7 +11,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 ## Progress
 
 - [x] (2026-01-02 21:30Z) Captured initial constraints, targets, and test suite scope for Lokad.Starlark.
-- [ ] Scaffold solution structure with `Lokad.Starlark.slnx`, core library project, and test project.
+- [x] (2026-01-02 21:45Z) Scaffolded `Lokad.Starlark.slnx`, core library project, and test project with multi-targeting.
 - [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs.
 - [ ] Implement runtime values, evaluator, and hermetic builtins for core language.
 - [ ] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
@@ -160,3 +160,4 @@ Plan updates must be recorded in the Decision Log and Progress sections, and a n
 Plan revisions:
 
 - Initial version created to capture constraints, milestones, and validation steps.
+- Updated Progress after scaffolding the solution and projects.
