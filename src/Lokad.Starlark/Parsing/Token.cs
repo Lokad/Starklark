@@ -22,6 +22,7 @@ public enum Token
 
     [Any("==")] Equal,
     [Any("!=")] NotEqual,
+    [Any("=")] Assign,
     [Any("+")] Plus,
     [Any("-")] Minus,
     [Any("*")] Star,

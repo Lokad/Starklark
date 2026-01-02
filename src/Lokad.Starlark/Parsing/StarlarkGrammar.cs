@@ -171,3 +171,8 @@ public class NTAttribute : NonTerminalAttribute
 {
     public NTAttribute(int maxRank = -1) : base(maxRank) { }
 }
+
+public class NTOAttribute : NonTerminalAttribute
+{
+    public NTOAttribute(int maxRank = -1) : base(maxRank, true) { }
+}

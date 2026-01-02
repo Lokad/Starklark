@@ -25,6 +25,7 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.Not => "'not'",
             Token.Equal => "'=='",
             Token.NotEqual => "'!='",
+            Token.Assign => "'='",
             Token.Plus => "'+'",
             Token.Minus => "'-'",
             Token.Star => "'*'",
