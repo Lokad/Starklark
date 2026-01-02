@@ -7,7 +7,7 @@ using Lokad.Starlark.Syntax;
 
 namespace Lokad.Starlark.Parsing;
 
-public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expression>
+public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, ExpressionRoot>
 {
     public StarlarkParser() : base(TokenNamer.Instance) { }
 
@@ -28,7 +28,7 @@ public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expres
 
         try
         {
-            return StreamParser(parser, tokens);
+            return StreamParser(parser, tokens).Expression;
         }
         catch (ParseException ex)
         {
@@ -40,7 +40,10 @@ public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expres
     }
 
     [Rule]
-    public Expression Root([NT] Expression expr, [T(Token.EoS)] Token eos) => expr;
+    public ExpressionRoot Root([NT] Expression expr, [T(Token.EoS)] Token eos)
+    {
+        return new ExpressionRoot(expr);
+    }
 
     [Rule]
     public Expression TrueLiteral([T(Token.True)] Token value) => new LiteralExpression(true);
@@ -161,6 +164,8 @@ public sealed class StarlarkParser : GrammarParser<StarlarkParser, Token, Expres
         return left;
     }
 }
+
+public readonly record struct ExpressionRoot(Expression Expression);
 
 public sealed class StarlarkParseException : Exception
 {
