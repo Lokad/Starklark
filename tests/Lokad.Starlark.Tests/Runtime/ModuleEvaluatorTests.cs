@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Lokad.Starlark;
 using Lokad.Starlark.Runtime;
 using Xunit;
@@ -51,5 +52,23 @@ public sealed class ModuleEvaluatorTests
         var result = interpreter.ExecuteModule("def add(a, b):\n  return a + b\nadd(2, 3)\n", environment);
 
         Assert.Equal(new StarlarkInt(5), result);
+    }
+
+    [Fact]
+    public void ExecutesLoadStatement()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+        environment.AddModule(
+            "math",
+            new Dictionary<string, StarlarkValue>
+            {
+                ["pi"] = new StarlarkFloat(3.14),
+                ["tau"] = new StarlarkFloat(6.28)
+            });
+
+        var result = interpreter.ExecuteModule("load(\"math\", \"pi\", circle=\"tau\")\npi + circle\n", environment);
+
+        Assert.Equal(new StarlarkFloat(9.42), result);
     }
 }

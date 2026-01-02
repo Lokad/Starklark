@@ -207,7 +207,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public LineEnding LineEnding([T(Token.EoL)] Token token) => new LineEnding();
 
-    private static string UnescapeString(string text)
+    protected static string UnescapeString(string text)
     {
         if (text.IndexOf('\\') < 0)
         {

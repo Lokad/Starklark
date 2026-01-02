@@ -31,3 +31,7 @@ public sealed record BreakStatement : Statement;
 public sealed record ContinueStatement : Statement;
 
 public sealed record PassStatement : Statement;
+
+public sealed record LoadBinding(string Name, string Alias);
+
+public sealed record LoadStatement(string Module, IReadOnlyList<LoadBinding> Bindings) : Statement;

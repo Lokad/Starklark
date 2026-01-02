@@ -11,6 +11,11 @@ public sealed class StarlarkEnvironment
 
     public IDictionary<string, StarlarkValue> Globals => Parent == null ? _locals : Parent.Globals;
 
+    private readonly Dictionary<string, IReadOnlyDictionary<string, StarlarkValue>> _modules;
+
+    public IDictionary<string, IReadOnlyDictionary<string, StarlarkValue>> Modules =>
+        Parent == null ? _modules : Parent.Modules;
+
     public StarlarkEnvironment()
         : this(null)
     {
@@ -20,6 +25,9 @@ public sealed class StarlarkEnvironment
     {
         Parent = parent;
         _locals = new Dictionary<string, StarlarkValue>(StringComparer.Ordinal);
+        _modules = parent == null
+            ? new Dictionary<string, IReadOnlyDictionary<string, StarlarkValue>>(StringComparer.Ordinal)
+            : parent._modules;
     }
 
     public StarlarkEnvironment CreateChild()
@@ -35,6 +43,11 @@ public sealed class StarlarkEnvironment
     public void AddFunction(string name, Func<IReadOnlyList<StarlarkValue>, StarlarkValue> implementation)
     {
         _locals[name] = new StarlarkFunction(name, implementation);
+    }
+
+    public void AddModule(string name, IReadOnlyDictionary<string, StarlarkValue> members)
+    {
+        Modules[name] = members;
     }
 
     public bool TryGet(string name, out StarlarkValue value)

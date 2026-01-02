@@ -90,4 +90,26 @@ public sealed class ModuleParsingTests
         Assert.Equal(new[] { "a", "b" }, function.Parameters);
         Assert.Single(function.Body);
     }
+
+    [Fact]
+    public void ParsesLoadStatement()
+    {
+        var module = StarlarkModuleParser.ParseModule("load(\"math\", \"sin\", cosine=\"cos\")\n");
+
+        var statement = Assert.Single(module.Statements);
+        var load = Assert.IsType<LoadStatement>(statement);
+        Assert.Equal("math", load.Module);
+        Assert.Collection(
+            load.Bindings,
+            binding =>
+            {
+                Assert.Equal("sin", binding.Name);
+                Assert.Equal("sin", binding.Alias);
+            },
+            binding =>
+            {
+                Assert.Equal("cos", binding.Name);
+                Assert.Equal("cosine", binding.Alias);
+            });
+    }
 }

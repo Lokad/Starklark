@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Lokad.Starlark.Syntax;
 
 namespace Lokad.Starlark.Runtime;
@@ -90,6 +91,10 @@ public sealed class ModuleEvaluator
                 case PassStatement:
                     lastValue = null;
                     break;
+                case LoadStatement loadStatement:
+                    ExecuteLoadStatement(loadStatement, environment);
+                    lastValue = null;
+                    break;
                 default:
                     throw new InvalidOperationException(
                         $"Unsupported statement type '{statement.GetType().Name}'.");
@@ -136,6 +141,25 @@ public sealed class ModuleEvaluator
         }
 
         return null;
+    }
+
+    private static void ExecuteLoadStatement(LoadStatement loadStatement, StarlarkEnvironment environment)
+    {
+        if (!environment.Modules.TryGetValue(loadStatement.Module, out var module))
+        {
+            throw new KeyNotFoundException($"Module '{loadStatement.Module}' not found.");
+        }
+
+        foreach (var binding in loadStatement.Bindings)
+        {
+            if (!module.TryGetValue(binding.Name, out var value))
+            {
+                throw new KeyNotFoundException(
+                    $"Symbol '{binding.Name}' not found in module '{loadStatement.Module}'.");
+            }
+
+            environment.Set(binding.Alias, value);
+        }
     }
 
     private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)

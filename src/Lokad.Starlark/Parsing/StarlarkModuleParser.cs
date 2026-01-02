@@ -103,6 +103,19 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     }
 
     [Rule]
+    public SimpleStatement LoadStatement(
+        [T(Token.Load)] Token keyword,
+        [T(Token.OpenParen)] Token openParen,
+        [T(Token.String)] string module,
+        [T(Token.Comma)] Token comma,
+        [L(Sep = Token.Comma)] LoadBinding[] bindings,
+        [T(Token.CloseParen)] Token closeParen)
+    {
+        return new SimpleStatement(
+            new LoadStatement(ParseStringLiteral(module), bindings));
+    }
+
+    [Rule]
     public CompoundStatement IfStatement(
         [T(Token.If)] Token keyword,
         [NT] Expression condition,
@@ -169,6 +182,28 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
 
     [Rule]
     public string ParameterName([T(Token.Id)] string name) => name;
+
+    [Rule]
+    public LoadBinding LoadBindingName([T(Token.String)] string name)
+    {
+        var value = ParseStringLiteral(name);
+        return new LoadBinding(value, value);
+    }
+
+    [Rule]
+    public LoadBinding LoadBindingAlias(
+        [T(Token.Id)] string alias,
+        [T(Token.Assign)] Token assign,
+        [T(Token.String)] string name)
+    {
+        return new LoadBinding(ParseStringLiteral(name), alias);
+    }
+
+    private static string ParseStringLiteral(string value)
+    {
+        var text = value.Length >= 2 ? value.Substring(1, value.Length - 2) : string.Empty;
+        return UnescapeString(text);
+    }
 
     [Rule]
     public Suite SingleLineSuite([NT] SimpleStatement statement)

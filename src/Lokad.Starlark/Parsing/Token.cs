@@ -31,6 +31,7 @@ public enum Token
     [Any("break"), F(Id, true)] Break,
     [Any("continue"), F(Id, true)] Continue,
     [Any("pass"), F(Id, true)] Pass,
+    [Any("load"), F(Id, true)] Load,
 
     [Any("==")] Equal,
     [Any("!=")] NotEqual,
