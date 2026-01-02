@@ -34,6 +34,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public Expression StringLiteral([T(Token.String)] string value)
     {
         var text = value.Length >= 2 ? value.Substring(1, value.Length - 2) : string.Empty;
+        text = UnescapeString(text);
         return new LiteralExpression(text);
     }
 
@@ -205,6 +206,119 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public LineEnding LineEnding([T(Token.EoL)] Token token) => new LineEnding();
+
+    private static string UnescapeString(string text)
+    {
+        if (text.IndexOf('\\') < 0)
+        {
+            return text;
+        }
+
+        var builder = new System.Text.StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (ch != '\\')
+            {
+                builder.Append(ch);
+                continue;
+            }
+
+            if (i + 1 >= text.Length)
+            {
+                builder.Append('\\');
+                break;
+            }
+
+            var next = text[++i];
+            switch (next)
+            {
+                case '\\': builder.Append('\\'); break;
+                case '"': builder.Append('"'); break;
+                case '\'': builder.Append('\''); break;
+                case 'n': builder.Append('\n'); break;
+                case 'r': builder.Append('\r'); break;
+                case 't': builder.Append('\t'); break;
+                case 'a': builder.Append('\a'); break;
+                case 'b': builder.Append('\b'); break;
+                case 'f': builder.Append('\f'); break;
+                case 'v': builder.Append('\v'); break;
+                case 'x':
+                    builder.Append(ReadHexEscape(text, ref i, 2));
+                    break;
+                case 'u':
+                    builder.Append(ReadHexEscape(text, ref i, 4));
+                    break;
+                case 'U':
+                    builder.Append(ReadHexEscape(text, ref i, 8));
+                    break;
+                default:
+                    if (next is >= '0' and <= '7')
+                    {
+                        builder.Append(ReadOctalEscape(text, ref i, next));
+                    }
+                    else
+                    {
+                        builder.Append(next);
+                    }
+                    break;
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static char ReadHexEscape(string text, ref int index, int digits)
+    {
+        var value = 0;
+        for (var j = 0; j < digits; j++)
+        {
+            if (index + 1 >= text.Length)
+            {
+                break;
+            }
+
+            var ch = text[index + 1];
+            var digit = ch switch
+            {
+                >= '0' and <= '9' => ch - '0',
+                >= 'a' and <= 'f' => 10 + (ch - 'a'),
+                >= 'A' and <= 'F' => 10 + (ch - 'A'),
+                _ => -1
+            };
+
+            if (digit < 0)
+            {
+                break;
+            }
+
+            value = (value << 4) + digit;
+            index++;
+        }
+
+        return (char)value;
+    }
+
+    private static char ReadOctalEscape(string text, ref int index, char firstDigit)
+    {
+        var value = firstDigit - '0';
+        var count = 1;
+
+        while (count < 3 && index + 1 < text.Length)
+        {
+            var ch = text[index + 1];
+            if (ch is < '0' or > '7')
+            {
+                break;
+            }
+
+            value = (value << 3) + (ch - '0');
+            index++;
+            count++;
+        }
+
+        return (char)value;
+    }
 }
 
 public readonly record struct LineEnding;

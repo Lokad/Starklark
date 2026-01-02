@@ -123,4 +123,20 @@ public sealed class ExpressionParsingTests
         var binary = Assert.IsType<BinaryExpression>(expr);
         Assert.Equal(BinaryOperator.Less, binary.Operator);
     }
+
+    [Fact]
+    public void ParsesStringEscapes()
+    {
+        var expr = StarlarkParser.ParseExpression("\"a\\n\\t\"");
+
+        Assert.Equal(new LiteralExpression("a\n\t"), expr);
+    }
+
+    [Fact]
+    public void ParsesHexAndOctalEscapes()
+    {
+        var expr = StarlarkParser.ParseExpression("\"\\x41\\101\"");
+
+        Assert.Equal(new LiteralExpression("AA"), expr);
+    }
 }
