@@ -53,6 +53,10 @@ Diagnostics & Error Behavior:
 4. Expand conformance suite with spec-driven edge cases and ensure deterministic errors.
 5. Stabilize and run the full suite across net8/net10.
 
+## Execution Mode
+
+Proceed unattended through the compliance plan without pausing for confirmation between steps, unless blocked by missing requirements or ambiguities that require user input.
+
 ## Surprises & Discoveries
 
 - Observation: `dotnet test` reports `MSB1009` when passed a `.slnx` file; CLI may not recognize the new solution format.
@@ -237,3 +241,4 @@ Plan revisions:
 - Added java/rust conformance subsets for string and regression coverage.
 - Added java/rust conformance subsets for string formatting behavior.
 - Added spec compliance checklist and compliance plan.
+- Set execution mode to proceed unattended through compliance work.
