@@ -13,7 +13,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-02 21:30Z) Captured initial constraints, targets, and test suite scope for Lokad.Starlark.
 - [x] (2026-01-02 21:45Z) Scaffolded `Lokad.Starlark.slnx`, core library project, and test project with multi-targeting.
 - [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser + basic module statements + if/elif blocks + for loops + function definitions + return/break/continue/pass + load statements + tuple assignment targets + augmented assignments + list/tuple/dict literals + indexing + slicing + in/not-in/comparison operators + conditional expressions + // and % operators + string escape handling; remaining: full Starlark grammar and statement parsing).
-- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + range type + expression evaluator + function calls + module execution + function bodies + loops + len/range/list/tuple/bool/any/all/dict/str/int/float/type builtins + list/tuple/dict equality with hashability checks; remaining: full value model and builtins).
+- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + range type + expression evaluator + function calls + module execution + function bodies + loops + len/range/list/tuple/bool/any/all/dict/str/int/float/type builtins + list/tuple/dict equality with hashability checks + string % formatting; remaining: full value model and builtins).
 - [ ] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
 - [ ] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness.
 - [ ] Extend test suite with non-redundant cases from `java`/`rust` when they cover distinct semantics.
@@ -188,3 +188,4 @@ Plan revisions:
 - Noted runtime progress after adding range values and core builtins.
 - Noted runtime progress after adding hashability checks and collection equality semantics.
 - Noted runtime progress after adding core conversion builtins and formatting helpers.
+- Noted runtime progress after adding string percent formatting support.

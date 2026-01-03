@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Lokad.Starlark;
 using Lokad.Starlark.Runtime;
@@ -165,5 +166,39 @@ public sealed class ModuleEvaluatorTests
             environment);
 
         Assert.Equal(new StarlarkInt(2), result);
+    }
+
+    [Fact]
+    public void ExecutesStringPercentFormatting()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("\"%s %r\" % (\"hi\", \"hi\")\n", environment);
+
+        Assert.Equal(new StarlarkString("hi \"hi\""), result);
+    }
+
+    [Fact]
+    public void ExecutesLiteralPercentFormatting()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("\"%%d %d\" % 1\n", environment);
+
+        Assert.Equal(new StarlarkString("%d 1"), result);
+    }
+
+    [Fact]
+    public void RaisesOnBadPercentFormattingArguments()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        Assert.Throws<InvalidOperationException>(
+            () => interpreter.ExecuteModule("\"%d %d\" % 1\n", environment));
+        Assert.Throws<InvalidOperationException>(
+            () => interpreter.ExecuteModule("\"%d %d\" % (1, 2, 3)\n", environment));
     }
 }

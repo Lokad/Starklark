@@ -509,6 +509,11 @@ public sealed class ModuleEvaluator
 
     private static StarlarkValue Modulo(StarlarkValue left, StarlarkValue right)
     {
+        if (left is StarlarkString leftString)
+        {
+            return new StarlarkString(StarlarkFormatting.FormatPercent(leftString.Value, right));
+        }
+
         if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
             if (rightInt.Value == 0)
