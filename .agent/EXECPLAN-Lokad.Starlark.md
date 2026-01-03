@@ -15,7 +15,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser + basic module statements + if/elif blocks + for loops + function definitions + return/break/continue/pass + load statements + tuple assignment targets + for loop tuple targets + augmented assignments + list/tuple/dict literals + indexing + slicing + in/not-in/comparison operators + conditional expressions + // and % operators + string escape handling + attribute access + keyword call arguments + *args/**kwargs + list/dict comprehensions + default parameter parsing; remaining: full Starlark grammar and statement parsing).
 - [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + range type + expression evaluator + function calls + module execution + function bodies + loops + for loop tuple targets + len/range/list/tuple/bool/any/all/dict/str/int/float/type/repr/sorted/reversed/min/max/enumerate/zip/dir/getattr/hasattr/fail builtins + list/tuple/dict equality with hashability checks + string % formatting + attribute-based methods + keyword arguments + *args/**kwargs + list/dict comprehensions + default argument binding + built-in function rendering + string non-iterability in loops/comprehensions; remaining: full value model and builtins).
 - [ ] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
-- [ ] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness (started: added initial harness, loop/comprehension subset, error-pattern cases, and control/function subsets).
+- [ ] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness (started: added initial harness, loop/comprehension subset, error-pattern cases, control/function subsets, and list/dict/string/int subsets).
 - [ ] Extend test suite with non-redundant cases from `java`/`rust` when they cover distinct semantics.
 - [ ] Add README/docs for extension model and test harness usage.
 - [ ] Final stabilization: run full test suite, review diffs, and prepare for packaging (NuGet metadata deferred).
@@ -197,3 +197,4 @@ Plan revisions:
 - Noted conformance harness start with loop/comprehension subset from go suite.
 - Added error-pattern conformance cases for assert helper failures.
 - Added control-flow and function-behavior conformance subsets from go suite.
+- Added list/dict/string/int conformance subsets from go suite.
