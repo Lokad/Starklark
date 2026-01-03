@@ -1,3 +1,5 @@
 bin/
 obj/
 .vs
+tests/Lokad.Starlark.Tests/TestData/Conformance/_fullsuite/
+artifacts/testresults/
