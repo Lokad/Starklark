@@ -126,4 +126,44 @@ public sealed class ModuleEvaluatorTests
 
         Assert.Equal(new StarlarkInt(4), result);
     }
+
+    [Fact]
+    public void ExecutesCoreConversionBuiltins()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "text = str([1, 2])\n" +
+            "kind = type(1)\n" +
+            "value = int(\"12\") + int(True) + int(1.9)\n" +
+            "float_value = float(\"3.5\") + float(2)\n" +
+            "(text, kind, value, float_value)\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkTuple(
+                new StarlarkValue[]
+                {
+                    new StarlarkString("[1, 2]"),
+                    new StarlarkString("int"),
+                    new StarlarkInt(14),
+                    new StarlarkFloat(5.5)
+                }),
+            result);
+    }
+
+    [Fact]
+    public void ExecutesDictBuiltin()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "items = dict([(\"a\", 1), (\"a\", 2), (\"b\", 3)])\n" +
+            "items[\"a\"]\n",
+            environment);
+
+        Assert.Equal(new StarlarkInt(2), result);
+    }
 }

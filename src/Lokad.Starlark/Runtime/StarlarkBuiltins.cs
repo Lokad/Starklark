@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Lokad.Starlark.Runtime;
 
@@ -13,6 +14,11 @@ public static class StarlarkBuiltins
         environment.AddFunction("bool", Bool);
         environment.AddFunction("any", Any);
         environment.AddFunction("all", All);
+        environment.AddFunction("dict", Dict);
+        environment.AddFunction("str", Str);
+        environment.AddFunction("int", Int);
+        environment.AddFunction("float", Float);
+        environment.AddFunction("type", Type);
     }
 
     private static StarlarkValue Len(IReadOnlyList<StarlarkValue> args)
@@ -123,6 +129,110 @@ public static class StarlarkBuiltins
         return new StarlarkBool(true);
     }
 
+    private static StarlarkValue Dict(IReadOnlyList<StarlarkValue> args)
+    {
+        if (args.Count == 0)
+        {
+            return new StarlarkDict(Array.Empty<KeyValuePair<StarlarkValue, StarlarkValue>>());
+        }
+
+        ExpectArgCount(args, 1);
+        if (args[0] is StarlarkDict dict)
+        {
+            return new StarlarkDict(dict.Entries);
+        }
+
+        var entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>();
+        foreach (var item in Enumerate(args[0]))
+        {
+            if (!TryGetPair(item, out var key, out var value))
+            {
+                throw new InvalidOperationException("dict update sequence element has length 1; 2 is required.");
+            }
+
+            StarlarkHash.EnsureHashable(key);
+            AddOrReplace(entries, key, value);
+        }
+
+        return new StarlarkDict(entries);
+    }
+
+    private static StarlarkValue Str(IReadOnlyList<StarlarkValue> args)
+    {
+        ExpectArgCount(args, 1);
+        return new StarlarkString(StarlarkFormatting.ToString(args[0]));
+    }
+
+    private static StarlarkValue Int(IReadOnlyList<StarlarkValue> args)
+    {
+        if (args.Count is < 1 or > 2)
+        {
+            throw new InvalidOperationException("int expects 1 or 2 arguments.");
+        }
+
+        var value = args[0];
+        if (value is StarlarkInt intValue)
+        {
+            return intValue;
+        }
+
+        if (value is StarlarkBool boolValue)
+        {
+            return new StarlarkInt(boolValue.Value ? 1 : 0);
+        }
+
+        if (value is StarlarkFloat floatValue)
+        {
+            return new StarlarkInt((long)floatValue.Value);
+        }
+
+        if (value is StarlarkString text)
+        {
+            var baseValue = 10;
+            if (args.Count == 2)
+            {
+                baseValue = checked((int)RequireInt(args[1]));
+                if (baseValue is < 2 or > 36)
+                {
+                    throw new InvalidOperationException("int base must be between 2 and 36.");
+                }
+            }
+
+            if (!TryParseInt(text.Value, baseValue, out var parsed))
+            {
+                throw new InvalidOperationException($"Invalid int literal: '{text.Value}'.");
+            }
+
+            return new StarlarkInt(parsed);
+        }
+
+        throw new InvalidOperationException($"Expected int-compatible value, got '{value.TypeName}'.");
+    }
+
+    private static StarlarkValue Float(IReadOnlyList<StarlarkValue> args)
+    {
+        ExpectArgCount(args, 1);
+        var value = args[0];
+        return value switch
+        {
+            StarlarkFloat floatValue => floatValue,
+            StarlarkInt intValue => new StarlarkFloat(intValue.Value),
+            StarlarkBool boolValue => new StarlarkFloat(boolValue.Value ? 1.0 : 0.0),
+            StarlarkString text when double.TryParse(
+                text.Value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsed) => new StarlarkFloat(parsed),
+            _ => throw new InvalidOperationException($"Expected float-compatible value, got '{value.TypeName}'.")
+        };
+    }
+
+    private static StarlarkValue Type(IReadOnlyList<StarlarkValue> args)
+    {
+        ExpectArgCount(args, 1);
+        return new StarlarkString(args[0].TypeName);
+    }
+
     private static long RequireInt(StarlarkValue value)
     {
         if (value is StarlarkInt intValue)
@@ -191,6 +301,79 @@ public static class StarlarkBuiltins
         if (args.Count != count)
         {
             throw new InvalidOperationException($"Expected {count} arguments, got {args.Count}.");
+        }
+    }
+
+    private static bool TryGetPair(StarlarkValue item, out StarlarkValue key, out StarlarkValue value)
+    {
+        if (item is StarlarkTuple tuple && tuple.Items.Count == 2)
+        {
+            key = tuple.Items[0];
+            value = tuple.Items[1];
+            return true;
+        }
+
+        if (item is StarlarkList list && list.Items.Count == 2)
+        {
+            key = list.Items[0];
+            value = list.Items[1];
+            return true;
+        }
+
+        key = StarlarkNone.Instance;
+        value = StarlarkNone.Instance;
+        return false;
+    }
+
+    private static void AddOrReplace(
+        List<KeyValuePair<StarlarkValue, StarlarkValue>> entries,
+        StarlarkValue key,
+        StarlarkValue value)
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (Equals(entries[i].Key, key))
+            {
+                entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
+                return;
+            }
+        }
+
+        entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+    }
+
+    private static bool TryParseInt(string text, int baseValue, out long value)
+    {
+        var trimmed = text.Trim();
+        if (trimmed.Length == 0)
+        {
+            value = 0;
+            return false;
+        }
+
+        var sign = 1;
+        var startIndex = 0;
+        if (trimmed[0] == '+' || trimmed[0] == '-')
+        {
+            sign = trimmed[0] == '-' ? -1 : 1;
+            startIndex = 1;
+        }
+
+        try
+        {
+            var parsed = Convert.ToInt64(trimmed[startIndex..], baseValue);
+            value = parsed * sign;
+            return true;
+        }
+        catch (FormatException)
+        {
+            value = 0;
+            return false;
+        }
+        catch (OverflowException)
+        {
+            value = 0;
+            return false;
         }
     }
 }
