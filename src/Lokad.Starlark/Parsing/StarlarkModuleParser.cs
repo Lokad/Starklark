@@ -251,8 +251,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
 
     private static string ParseStringLiteral(string value)
     {
-        var text = value.Length >= 2 ? value.Substring(1, value.Length - 2) : string.Empty;
-        return UnescapeString(text);
+        return StringLiteralParser.Parse(value);
     }
 
     [Rule]

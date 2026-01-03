@@ -72,6 +72,6 @@ public enum Token
     [Pattern("[0-9]+(\\.[0-9]+)?", Start = "0123456789")]
     Number,
 
-    [Pattern("\"([^\"\\\\\\n]|\\\\.)*\"", Start = "\"")]
+    [Pattern("([rR]?\"([^\"\\\\\\n]|\\\\.)*\"|[rR]?'([^'\\\\\\n]|\\\\.)*')", Start = "\"'rR")]
     String,
 }

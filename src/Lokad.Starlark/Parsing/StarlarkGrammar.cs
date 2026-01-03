@@ -35,9 +35,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public Expression StringLiteral([T(Token.String)] string value)
     {
-        var text = value.Length >= 2 ? value.Substring(1, value.Length - 2) : string.Empty;
-        text = UnescapeString(text);
-        return new LiteralExpression(text);
+        return new LiteralExpression(StringLiteralParser.Parse(value));
     }
 
     [Rule]
@@ -50,6 +48,14 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [T(Token.CloseParen)] Token close)
     {
         return inner;
+    }
+
+    [Rule]
+    public Expression EmptyTupleLiteral(
+        [T(Token.OpenParen)] Token open,
+        [T(Token.CloseParen)] Token close)
+    {
+        return new TupleExpression(Array.Empty<Expression>());
     }
 
     [Rule]
@@ -85,13 +91,13 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public CallArgument NamedArgument(
         [T(Token.Id)] string name,
         [T(Token.Assign)] Token assign,
-        [NT(2)] Expression value)
+        [NT(3)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Keyword, name, value);
     }
 
     [Rule]
-    public CallArgument PositionalArgument([NT(2)] Expression value)
+    public CallArgument PositionalArgument([NT(3)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Positional, null, value);
     }
@@ -99,7 +105,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public CallArgument StarArgument(
         [T(Token.Star)] Token star,
-        [NT(2)] Expression value)
+        [NT(3)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Star, null, value);
     }
@@ -107,7 +113,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public CallArgument StarStarArgument(
         [T(Token.StarStar)] Token star,
-        [NT(2)] Expression value)
+        [NT(3)] Expression value)
     {
         return new CallArgument(CallArgumentKind.StarStar, null, value);
     }
@@ -484,7 +490,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public LineEnding LineEnding([T(Token.EoL)] Token token) => new LineEnding();
 
-    protected static string UnescapeString(string text)
+    internal static string UnescapeString(string text)
     {
         if (text.IndexOf('\\') < 0)
         {

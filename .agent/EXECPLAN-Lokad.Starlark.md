@@ -52,6 +52,7 @@ Diagnostics & Error Behavior:
 3. Finish builtins/methods per spec and add targeted tests for each.
 4. Expand conformance suite with spec-driven edge cases and ensure deterministic errors.
 5. Stabilize and run the full suite across net8/net10.
+6. Create a root-level `README.md` with project overview and a C# usage snippet (NuGet name: `Lokad.Starlark`).
 
 ## Execution Mode
 
@@ -242,3 +243,4 @@ Plan revisions:
 - Added java/rust conformance subsets for string formatting behavior.
 - Added spec compliance checklist and compliance plan.
 - Set execution mode to proceed unattended through compliance work.
+- Enabled parsing for single-quoted/raw strings, empty tuples, and conditional expressions in call arguments.
