@@ -61,6 +61,68 @@ public sealed class ModuleEvaluatorTests
     }
 
     [Fact]
+    public void ExecutesNestedTupleForTarget()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "def f():\n" +
+            "  res = []\n" +
+            "  for (x, y), z in [([\"a\", \"b\"], 3), ([\"c\", \"d\"], 4)]:\n" +
+            "    res.append((x, y, z))\n" +
+            "  return res\n" +
+            "f()\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkList(new StarlarkValue[]
+            {
+                new StarlarkTuple(new StarlarkValue[]
+                {
+                    new StarlarkString("a"),
+                    new StarlarkString("b"),
+                    new StarlarkInt(3)
+                }),
+                new StarlarkTuple(new StarlarkValue[]
+                {
+                    new StarlarkString("c"),
+                    new StarlarkString("d"),
+                    new StarlarkInt(4)
+                })
+            }),
+            result);
+    }
+
+    [Fact]
+    public void ExecutesIndexForTarget()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "def g():\n" +
+            "  a = {}\n" +
+            "  for i, a[i] in [(\"one\", 1), (\"two\", 2)]:\n" +
+            "    pass\n" +
+            "  return a\n" +
+            "g()\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkDict(new[]
+            {
+                new KeyValuePair<StarlarkValue, StarlarkValue>(
+                    new StarlarkString("one"),
+                    new StarlarkInt(1)),
+                new KeyValuePair<StarlarkValue, StarlarkValue>(
+                    new StarlarkString("two"),
+                    new StarlarkInt(2))
+            }),
+            result);
+    }
+
+    [Fact]
     public void ExecutesFunctionDefinition()
     {
         var interpreter = new StarlarkInterpreter();
