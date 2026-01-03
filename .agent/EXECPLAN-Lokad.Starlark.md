@@ -24,6 +24,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 13:25Z) Added boolean ordering comparisons with conformance coverage.
 - [x] (2026-01-03 13:40Z) Aligned numeric equality, hashing, and comparisons for int/float mix.
 - [x] (2026-01-03 14:05Z) Added NaN comparison coverage and recursion guards for equality/`repr`.
+- [x] (2026-01-03 14:20Z) Added java/rust conformance slices and modulo subsets.
 
 ## Spec Compliance Checklist
 
@@ -254,3 +255,4 @@ Plan revisions:
 - Added boolean ordering comparisons with conformance coverage.
 - Aligned numeric equality, hashing, and comparisons for mixed int/float values.
 - Added NaN comparison coverage and recursion guards for equality/`repr`.
+- Added java list/string slice subsets plus rust int modulo coverage.
