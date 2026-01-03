@@ -37,3 +37,19 @@ Run the full suite with:
 ```powershell
 dotnet test --tl:off --nologo -v minimal
 ```
+
+## CLI Demo
+
+The CLI is a local demo utility (not packaged in the NuGet) with two modes: a hermetic REPL and a script runner. It injects a `print` helper to demonstrate host extensibility.
+
+Start the REPL:
+
+```powershell
+dotnet run --project tools/Lokad.Starlark.Cli -- repl
+```
+
+Run a script file:
+
+```powershell
+dotnet run --project tools/Lokad.Starlark.Cli -- run path\to\script.star
+```

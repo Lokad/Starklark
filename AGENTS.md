@@ -25,3 +25,8 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 
 - Conformance scripts live under `tests/Lokad.Starlark.Tests/TestData/Conformance` (subfolders for go/java/rust) and use `---` to split independent cases.
 - Inline `### (regex)` after a statement marks the expected error message for the case.
+
+## CLI demo
+
+- REPL: `dotnet run --project tools/Lokad.Starlark.Cli --framework net8.0 -- repl`
+- Run a script: `dotnet run --project tools/Lokad.Starlark.Cli --framework net8.0 -- run path\to\script.star`
