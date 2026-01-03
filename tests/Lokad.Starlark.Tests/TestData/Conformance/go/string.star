@@ -56,3 +56,11 @@ assert_eq("A\nB\rC\r\nD".splitlines(), ["A", "B", "C", "D"])
 assert_eq("one\n\ntwo".splitlines(True), ["one\n", "\n", "two"])
 ---
 assert_eq(hash("abc"), 96354)
+---
+assert_eq("%s %r" % ("hi", "hi"), 'hi "hi"')
+assert_eq("%%d %d" % 1, "%d 1")
+assert_eq("A %(foo)d %(bar)s Z" % {"foo": 123, "bar": "hi"}, "A 123 hi Z")
+---
+"%d %d" % 1 ### (Not enough arguments|not iterable)
+---
+"%d %d" % (1, 2, 3) ### (Too many arguments|not all arguments)

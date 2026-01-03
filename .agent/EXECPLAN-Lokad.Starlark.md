@@ -33,6 +33,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 18:05Z) Added set type, operators/methods, and conformance coverage.
 - [x] (2026-01-03 18:35Z) Added lambda expressions and conformance coverage.
 - [x] (2026-01-03 19:00Z) Added numeric literal parsing and load statement restrictions with conformance coverage.
+- [x] (2026-01-03 19:10Z) Added `%` formatting and `str.format` edge-case coverage.
 
 ## Spec Compliance Checklist
 
@@ -58,7 +59,7 @@ Builtins & Methods:
 - Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
 - Complete string/list/dict methods per spec, including argument validation and error messages.
 - Implement set type and set builtins/methods/operators. (done)
-- Verify `%` formatting and `str.format` behaviors with spec-aligned edge cases.
+- Verify `%` formatting and `str.format` behaviors with spec-aligned edge cases. (done)
 - Add `bytes` builtin, `bytes.elems`, and missing string methods (`capitalize`, `elems`, `islower`, `istitle`, `isupper`, `isspace`). (done)
 
 Diagnostics & Error Behavior:
@@ -276,3 +277,4 @@ Plan revisions:
 - Updated compliance checklist/progress after adding set coverage and operators.
 - Updated compliance checklist/progress after adding lambda expressions.
 - Updated compliance checklist/progress after adding numeric literal parsing and load restrictions.
+- Updated conformance coverage for `%` formatting and `str.format` edge cases.
