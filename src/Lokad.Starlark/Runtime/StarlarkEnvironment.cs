@@ -45,7 +45,9 @@ public sealed class StarlarkEnvironment
         _locals[name] = value;
     }
 
-    public void AddFunction(string name, Func<IReadOnlyList<StarlarkValue>, StarlarkValue> implementation)
+    public void AddFunction(
+        string name,
+        Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> implementation)
     {
         _locals[name] = new StarlarkFunction(name, implementation);
     }

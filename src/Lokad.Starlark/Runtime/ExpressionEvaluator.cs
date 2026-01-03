@@ -20,6 +20,7 @@ public sealed class ExpressionEvaluator
             TupleExpression tuple => EvaluateTuple(tuple, environment),
             DictExpression dict => EvaluateDict(dict, environment),
             IndexExpression index => EvaluateIndex(index, environment),
+            AttributeExpression attribute => EvaluateAttribute(attribute, environment),
             ConditionalExpression conditional => EvaluateConditional(conditional, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
@@ -128,13 +129,36 @@ public sealed class ExpressionEvaluator
                 $"Attempted to call non-callable value of type '{callee.TypeName}'.");
         }
 
-        var args = new StarlarkValue[call.Arguments.Count];
+        var args = new List<StarlarkValue>(call.Arguments.Count);
+        var kwargs = new Dictionary<string, StarlarkValue>(StringComparer.Ordinal);
+        var seenKeyword = false;
+
         for (var i = 0; i < call.Arguments.Count; i++)
         {
-            args[i] = Evaluate(call.Arguments[i], environment);
+            var argument = call.Arguments[i];
+            if (argument.Name == null)
+            {
+                if (seenKeyword)
+                {
+                    throw new InvalidOperationException("Positional argument follows keyword argument.");
+                }
+
+                args.Add(Evaluate(argument.Value, environment));
+            }
+            else
+            {
+                seenKeyword = true;
+                if (kwargs.ContainsKey(argument.Name))
+                {
+                    throw new InvalidOperationException(
+                        $"Got multiple values for keyword argument '{argument.Name}'.");
+                }
+
+                kwargs[argument.Name] = Evaluate(argument.Value, environment);
+            }
         }
 
-        return function.Call(args);
+        return function.Call(args, kwargs);
     }
 
     private StarlarkValue EvaluateList(ListExpression list, StarlarkEnvironment environment)
@@ -172,6 +196,12 @@ public sealed class ExpressionEvaluator
         }
 
         return new StarlarkDict(entries);
+    }
+
+    private StarlarkValue EvaluateAttribute(AttributeExpression attribute, StarlarkEnvironment environment)
+    {
+        var target = Evaluate(attribute.Target, environment);
+        return StarlarkMethods.Bind(target, attribute.Name);
     }
 
     private StarlarkValue EvaluateIndex(IndexExpression index, StarlarkEnvironment environment)

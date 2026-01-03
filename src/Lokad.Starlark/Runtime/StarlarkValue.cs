@@ -261,7 +261,9 @@ public sealed class StarlarkNone : StarlarkValue
 
 public abstract class StarlarkCallable : StarlarkValue
 {
-    public abstract StarlarkValue Call(IReadOnlyList<StarlarkValue> args);
+    public abstract StarlarkValue Call(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs);
 
     public override string TypeName => "function";
     public override bool IsTruthy => true;
@@ -271,16 +273,39 @@ public sealed class StarlarkFunction : StarlarkCallable
 {
     public StarlarkFunction(
         string name,
-        Func<IReadOnlyList<StarlarkValue>, StarlarkValue> invoke)
+        Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> invoke)
     {
         Name = name;
         Invoke = invoke;
     }
 
     public string Name { get; }
-    public Func<IReadOnlyList<StarlarkValue>, StarlarkValue> Invoke { get; }
+    public Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> Invoke { get; }
 
-    public override StarlarkValue Call(IReadOnlyList<StarlarkValue> args) => Invoke(args);
+    public override StarlarkValue Call(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs) => Invoke(args, kwargs);
+}
+
+public sealed class StarlarkBoundMethod : StarlarkCallable
+{
+    public StarlarkBoundMethod(
+        string name,
+        StarlarkValue target,
+        Func<StarlarkValue, IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> invoke)
+    {
+        Name = name;
+        Target = target;
+        Invoke = invoke;
+    }
+
+    public string Name { get; }
+    public StarlarkValue Target { get; }
+    public Func<StarlarkValue, IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> Invoke { get; }
+
+    public override StarlarkValue Call(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs) => Invoke(Target, args, kwargs);
 }
 
 public sealed class StarlarkUserFunction : StarlarkCallable
@@ -302,18 +327,64 @@ public sealed class StarlarkUserFunction : StarlarkCallable
     public IReadOnlyList<Lokad.Starlark.Syntax.Statement> Body { get; }
     public StarlarkEnvironment Closure { get; }
 
-    public override StarlarkValue Call(IReadOnlyList<StarlarkValue> args)
+    public override StarlarkValue Call(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        if (args.Count != Parameters.Count)
+        if (args.Count > Parameters.Count)
         {
             throw new InvalidOperationException(
                 $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count}.");
         }
 
+        var values = new StarlarkValue[Parameters.Count];
+        for (var i = 0; i < args.Count; i++)
+        {
+            values[i] = args[i];
+        }
+
+        if (kwargs.Count > 0)
+        {
+            foreach (var pair in kwargs)
+            {
+                var index = -1;
+                for (var i = 0; i < Parameters.Count; i++)
+                {
+                    if (Parameters[i] == pair.Key)
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+                if (index < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Function '{Name}' got an unexpected keyword argument '{pair.Key}'.");
+                }
+
+                if (index < args.Count || values[index] != null)
+                {
+                    throw new InvalidOperationException(
+                        $"Function '{Name}' got multiple values for argument '{pair.Key}'.");
+                }
+
+                values[index] = pair.Value;
+            }
+        }
+
+        for (var i = 0; i < values.Length; i++)
+        {
+            if (values[i] == null)
+            {
+                throw new InvalidOperationException(
+                    $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count + kwargs.Count}.");
+            }
+        }
+
         var callEnvironment = Closure.CreateChild();
         for (var i = 0; i < Parameters.Count; i++)
         {
-            callEnvironment.Set(Parameters[i], args[i]);
+            callEnvironment.Set(Parameters[i], values[i]);
         }
 
         var evaluator = new ModuleEvaluator();

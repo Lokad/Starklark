@@ -61,6 +61,7 @@ public enum Token
     [Any("}")] CloseBrace,
     [Any(",")] Comma,
     [Any(":")] Colon,
+    [Any(".")] Dot,
 
     [Pattern("[A-Za-z_][A-Za-z0-9_]*")]
     Id,

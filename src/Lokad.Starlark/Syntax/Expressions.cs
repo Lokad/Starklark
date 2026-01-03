@@ -12,7 +12,9 @@ public sealed record UnaryExpression(UnaryOperator Operator, Expression Operand)
 
 public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, Expression Right) : Expression;
 
-public sealed record CallExpression(Expression Callee, IReadOnlyList<Expression> Arguments) : Expression;
+public sealed record CallExpression(Expression Callee, IReadOnlyList<CallArgument> Arguments) : Expression;
+
+public sealed record CallArgument(string? Name, Expression Value);
 
 public sealed record ListExpression(IReadOnlyList<Expression> Items) : Expression;
 
@@ -29,6 +31,8 @@ public sealed record IndexValue(Expression Value) : IndexSpecifier;
 public sealed record SliceIndex(Expression? Start, Expression? Stop, Expression? Step) : IndexSpecifier;
 
 public sealed record IndexExpression(Expression Target, IndexSpecifier Index) : Expression;
+
+public sealed record AttributeExpression(Expression Target, string Name) : Expression;
 
 public sealed record ConditionalExpression(
     Expression Condition,

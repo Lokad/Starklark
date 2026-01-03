@@ -87,6 +87,7 @@ public static class StarlarkFormatting
             StarlarkRange range => FormatRange(range),
             StarlarkFunction function => $"<function {function.Name}>",
             StarlarkUserFunction function => $"<function {function.Name}>",
+            StarlarkBoundMethod method => $"<bound method {method.Name}>",
             StarlarkCallable => "<function>",
             _ => value.TypeName
         };

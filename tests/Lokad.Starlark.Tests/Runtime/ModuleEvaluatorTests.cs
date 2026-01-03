@@ -201,4 +201,68 @@ public sealed class ModuleEvaluatorTests
         Assert.Throws<InvalidOperationException>(
             () => interpreter.ExecuteModule("\"%d %d\" % (1, 2, 3)\n", environment));
     }
+
+    [Fact]
+    public void ExecutesStringMethods()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "\"a.b.c\".split(\".\")\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkList(new StarlarkValue[]
+            {
+                new StarlarkString("a"),
+                new StarlarkString("b"),
+                new StarlarkString("c")
+            }),
+            result);
+    }
+
+    [Fact]
+    public void ExecutesListMethods()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "items = [1]\n" +
+            "items.append(2)\n" +
+            "items.extend([3, 4])\n" +
+            "items.pop()\n",
+            environment);
+
+        Assert.Equal(new StarlarkInt(4), result);
+    }
+
+    [Fact]
+    public void ExecutesDictMethods()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "values = {\"a\": 1}\n" +
+            "values.update(b=2)\n" +
+            "values.get(\"b\")\n",
+            environment);
+
+        Assert.Equal(new StarlarkInt(2), result);
+    }
+
+    [Fact]
+    public void ExecutesFormatWithKeywords()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "\"a{x}b{y}c{}\".format(1, x=2, y=3)\n",
+            environment);
+
+        Assert.Equal(new StarlarkString("a2b3c1"), result);
+    }
 }

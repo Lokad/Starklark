@@ -73,10 +73,34 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public Expression Call(
         [NT(0)] Expression callee,
         [T(Token.OpenParen)] Token open,
-        [L(Sep = Token.Comma)] Expression[] args,
+        [L(Sep = Token.Comma)] CallArgument[] args,
         [T(Token.CloseParen)] Token close)
     {
         return new CallExpression(callee, args);
+    }
+
+    [Rule]
+    public CallArgument NamedArgument(
+        [T(Token.Id)] string name,
+        [T(Token.Assign)] Token assign,
+        [NT(2)] Expression value)
+    {
+        return new CallArgument(name, value);
+    }
+
+    [Rule]
+    public CallArgument PositionalArgument([NT(2)] Expression value)
+    {
+        return new CallArgument(null, value);
+    }
+
+    [Rule]
+    public Expression Attribute(
+        [NT(0)] Expression target,
+        [T(Token.Dot)] Token dot,
+        [T(Token.Id)] string name)
+    {
+        return new AttributeExpression(target, name);
     }
 
     [Rule]

@@ -21,8 +21,11 @@ public static class StarlarkBuiltins
         environment.AddFunction("type", Type);
     }
 
-    private static StarlarkValue Len(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Len(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
 
         return args[0] switch
@@ -36,8 +39,11 @@ public static class StarlarkBuiltins
         };
     }
 
-    private static StarlarkValue Range(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Range(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         if (args.Count is < 1 or > 3)
         {
             throw new InvalidOperationException("range expects 1 to 3 arguments.");
@@ -71,8 +77,11 @@ public static class StarlarkBuiltins
         return new StarlarkRange(start, stop, step);
     }
 
-    private static StarlarkValue List(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue List(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkList(Array.Empty<StarlarkValue>());
@@ -83,8 +92,11 @@ public static class StarlarkBuiltins
         return new StarlarkList(items);
     }
 
-    private static StarlarkValue Tuple(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Tuple(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkTuple(Array.Empty<StarlarkValue>());
@@ -95,14 +107,20 @@ public static class StarlarkBuiltins
         return new StarlarkTuple(items);
     }
 
-    private static StarlarkValue Bool(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Bool(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
         return new StarlarkBool(args[0].IsTruthy);
     }
 
-    private static StarlarkValue Any(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Any(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
         foreach (var item in Enumerate(args[0]))
         {
@@ -115,8 +133,11 @@ public static class StarlarkBuiltins
         return new StarlarkBool(false);
     }
 
-    private static StarlarkValue All(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue All(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
         foreach (var item in Enumerate(args[0]))
         {
@@ -129,42 +150,63 @@ public static class StarlarkBuiltins
         return new StarlarkBool(true);
     }
 
-    private static StarlarkValue Dict(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Dict(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        if (args.Count == 0)
+        if (args.Count == 0 && kwargs.Count == 0)
         {
             return new StarlarkDict(Array.Empty<KeyValuePair<StarlarkValue, StarlarkValue>>());
         }
 
-        ExpectArgCount(args, 1);
-        if (args[0] is StarlarkDict dict)
+        if (args.Count > 1)
         {
-            return new StarlarkDict(dict.Entries);
+            throw new InvalidOperationException("dict expects 0 or 1 positional arguments.");
         }
 
         var entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>();
-        foreach (var item in Enumerate(args[0]))
+        if (args.Count == 1 && args[0] is StarlarkDict dict)
         {
-            if (!TryGetPair(item, out var key, out var value))
+            entries.AddRange(dict.Entries);
+        }
+        else if (args.Count == 1)
+        {
+            foreach (var item in Enumerate(args[0]))
             {
-                throw new InvalidOperationException("dict update sequence element has length 1; 2 is required.");
-            }
+                if (!TryGetPair(item, out var key, out var value))
+                {
+                    throw new InvalidOperationException("dict update sequence element has length 1; 2 is required.");
+                }
 
+                StarlarkHash.EnsureHashable(key);
+                AddOrReplace(entries, key, value);
+            }
+        }
+
+        foreach (var pair in kwargs)
+        {
+            var key = new StarlarkString(pair.Key);
             StarlarkHash.EnsureHashable(key);
-            AddOrReplace(entries, key, value);
+            AddOrReplace(entries, key, pair.Value);
         }
 
         return new StarlarkDict(entries);
     }
 
-    private static StarlarkValue Str(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Str(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
         return new StarlarkString(StarlarkFormatting.ToString(args[0]));
     }
 
-    private static StarlarkValue Int(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Int(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         if (args.Count is < 1 or > 2)
         {
             throw new InvalidOperationException("int expects 1 or 2 arguments.");
@@ -209,8 +251,11 @@ public static class StarlarkBuiltins
         throw new InvalidOperationException($"Expected int-compatible value, got '{value.TypeName}'.");
     }
 
-    private static StarlarkValue Float(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Float(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
         var value = args[0];
         return value switch
@@ -227,8 +272,11 @@ public static class StarlarkBuiltins
         };
     }
 
-    private static StarlarkValue Type(IReadOnlyList<StarlarkValue> args)
+    private static StarlarkValue Type(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
+        ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1);
         return new StarlarkString(args[0].TypeName);
     }
@@ -301,6 +349,14 @@ public static class StarlarkBuiltins
         if (args.Count != count)
         {
             throw new InvalidOperationException($"Expected {count} arguments, got {args.Count}.");
+        }
+    }
+
+    private static void ExpectNoKeywords(IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        if (kwargs.Count > 0)
+        {
+            throw new InvalidOperationException("Unexpected keyword arguments.");
         }
     }
 

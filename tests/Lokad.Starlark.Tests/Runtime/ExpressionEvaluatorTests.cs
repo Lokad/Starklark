@@ -34,7 +34,7 @@ public sealed class ExpressionEvaluatorTests
         var environment = new StarlarkEnvironment();
         environment.AddFunction(
             "add",
-            args => new StarlarkInt(((StarlarkInt)args[0]).Value + ((StarlarkInt)args[1]).Value));
+            (args, _) => new StarlarkInt(((StarlarkInt)args[0]).Value + ((StarlarkInt)args[1]).Value));
 
         var evaluator = new ExpressionEvaluator();
         var result = evaluator.Evaluate(expr, environment);
