@@ -124,6 +124,21 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void RejectsInvalidForTargets()
+    {
+        Assert.Throws<StarlarkParseException>(
+            () => StarlarkModuleParser.ParseModule("for 1 in [1]:\n  pass\n"));
+        Assert.Throws<StarlarkParseException>(
+            () => StarlarkModuleParser.ParseModule("for x.y in [1]:\n  pass\n"));
+        Assert.Throws<StarlarkParseException>(
+            () => StarlarkModuleParser.ParseModule("for (x) in [1]:\n  pass\n"));
+        Assert.Throws<StarlarkParseException>(
+            () => StarlarkModuleParser.ParseModule("for x[1:] in [1]:\n  pass\n"));
+        Assert.Throws<StarlarkParseException>(
+            () => StarlarkModuleParser.ParseModule("for f() in [1]:\n  pass\n"));
+    }
+
+    [Fact]
     public void ParsesFunctionDefinition()
     {
         var module = StarlarkModuleParser.ParseModule("def add(a, b):\n  return a + b\n");
