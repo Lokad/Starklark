@@ -1,4 +1,6 @@
+using System;
 using System.Globalization;
+using System.Linq;
 using Lokad.Parsing;
 using Lokad.Parsing.Parser;
 using Lokad.Starlark.Syntax;
@@ -119,13 +121,48 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new AttributeExpression(target, name);
     }
 
-    [Rule]
-    public Expression ListLiteral(
+    [Rule(Rank = 3)]
+    public Expression ListComprehension(
         [T(Token.OpenBracket)] Token open,
-        [L(Sep = Token.Comma)] Expression[] items,
+        [NT] Expression body,
+        [NT] ComprehensionFor forClause,
+        [L] ComprehensionQualifier[] qualifiers,
+        [T(Token.CloseBracket)] Token close)
+    {
+        var clauses = new ComprehensionClause[qualifiers.Length + 1];
+        clauses[0] = forClause.Clause;
+        for (var i = 0; i < qualifiers.Length; i++)
+        {
+            clauses[i + 1] = qualifiers[i].Clause;
+        }
+
+        return new ListComprehensionExpression(body, clauses);
+    }
+
+    [Rule]
+    public Expression ListLiteralMultiple(
+        [T(Token.OpenBracket)] Token open,
+        [L(Sep = Token.Comma, Min = 2)] Expression[] items,
         [T(Token.CloseBracket)] Token close)
     {
         return new ListExpression(items);
+    }
+
+    [Rule]
+    public Expression ListLiteralSingle(
+        [T(Token.OpenBracket)] Token open,
+        [NT] Expression item,
+        [T(Token.CloseBracket)] Token close)
+    {
+        return new ListExpression(new[] { item });
+    }
+
+    [Rule]
+    public Expression ListLiteralEmpty(
+        [T(Token.OpenBracket)] Token open,
+        [T(Token.CloseBracket)] Token close)
+    {
+        return new ListExpression(Array.Empty<Expression>());
     }
 
     [Rule]
@@ -138,12 +175,138 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     }
 
     [Rule]
-    public Expression DictLiteral(
+    public Expression DictLiteralMultiple(
         [T(Token.OpenBrace)] Token open,
-        [L(Sep = Token.Comma)] DictEntry[] entries,
+        [L(Sep = Token.Comma, Min = 2)] DictEntry[] entries,
         [T(Token.CloseBrace)] Token close)
     {
         return new DictExpression(entries);
+    }
+
+    [Rule(Rank = 3)]
+    public Expression DictComprehension(
+        [T(Token.OpenBrace)] Token open,
+        [NT(3)] Expression key,
+        [T(Token.Colon)] Token colon,
+        [NT(3)] Expression value,
+        [NT] ComprehensionFor forClause,
+        [L] ComprehensionQualifier[] qualifiers,
+        [T(Token.CloseBrace)] Token close)
+    {
+        var clauses = new ComprehensionClause[qualifiers.Length + 1];
+        clauses[0] = forClause.Clause;
+        for (var i = 0; i < qualifiers.Length; i++)
+        {
+            clauses[i + 1] = qualifiers[i].Clause;
+        }
+
+        return new DictComprehensionExpression(key, value, clauses);
+    }
+
+    [Rule]
+    public Expression DictLiteralSingle(
+        [T(Token.OpenBrace)] Token open,
+        [NT(3)] Expression key,
+        [T(Token.Colon)] Token colon,
+        [NT(3)] Expression value,
+        [T(Token.CloseBrace)] Token close)
+    {
+        return new DictExpression(new[] { new DictEntry(key, value) });
+    }
+
+    [Rule]
+    public Expression DictLiteralEmpty(
+        [T(Token.OpenBrace)] Token open,
+        [T(Token.CloseBrace)] Token close)
+    {
+        return new DictExpression(Array.Empty<DictEntry>());
+    }
+
+    [Rule]
+    public ComprehensionFor ComprehensionForClause(
+        [T(Token.For)] Token keyword,
+        [NT] AssignmentTarget target,
+        [T(Token.In)] Token inKeyword,
+        [NT(2)] Expression iterable)
+    {
+        return new ComprehensionFor(
+            new ComprehensionClause(
+                ComprehensionClauseKind.For,
+                target,
+                iterable,
+                null));
+    }
+
+    [Rule]
+    public ComprehensionQualifier ComprehensionQualifierFor(
+        [T(Token.For)] Token keyword,
+        [NT] AssignmentTarget target,
+        [T(Token.In)] Token inKeyword,
+        [NT(2)] Expression iterable)
+    {
+        return new ComprehensionQualifier(
+            new ComprehensionClause(
+                ComprehensionClauseKind.For,
+                target,
+                iterable,
+                null));
+    }
+
+    [Rule]
+    public ComprehensionQualifier ComprehensionQualifierIf(
+        [T(Token.If)] Token keyword,
+        [NT] Expression condition)
+    {
+        return new ComprehensionQualifier(
+            new ComprehensionClause(
+                ComprehensionClauseKind.If,
+                null,
+                null,
+                condition));
+    }
+
+    [Rule]
+    public AssignmentTarget TargetName([T(Token.Id)] string name)
+    {
+        return new NameTarget(name);
+    }
+
+    [Rule]
+    public AssignmentTarget TargetIndex(
+        [NT(0)] Expression target,
+        [T(Token.OpenBracket)] Token open,
+        [NT] Expression index,
+        [T(Token.CloseBracket)] Token close)
+    {
+        return new IndexTarget(target, index);
+    }
+
+    [Rule]
+    public AssignmentTarget TargetTuple(
+        [T(Token.OpenParen)] Token open,
+        [L(Sep = Token.Comma, Min = 2)] AssignmentTarget[] items,
+        [T(Token.CloseParen)] Token close)
+    {
+        return new TupleTarget(items);
+    }
+
+    [Rule]
+    public AssignmentTarget TargetSingleTuple(
+        [T(Token.OpenParen)] Token open,
+        [NT] AssignmentTarget item,
+        [T(Token.Comma)] Token comma,
+        [T(Token.CloseParen)] Token close)
+    {
+        return new TupleTarget(new[] { item });
+    }
+
+    [Rule]
+    public AssignmentTarget TargetList(
+        [T(Token.OpenBracket)] Token open,
+        [L(Sep = Token.Comma, Min = 1)] AssignmentTarget[] items,
+        [T(Token.CloseBracket)] Token close)
+    {
+        return new ListTarget(items);
     }
 
     [Rule]
@@ -426,11 +589,38 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
         return (char)value;
     }
+
+    protected static AssignmentTarget ToAssignmentTarget(Expression expression)
+    {
+        return expression switch
+        {
+            IdentifierExpression identifier => new NameTarget(identifier.Name),
+            IndexExpression index => ToIndexTarget(index),
+            ListExpression list => new ListTarget(list.Items.Select(ToAssignmentTarget).ToArray()),
+            TupleExpression tuple => new TupleTarget(tuple.Items.Select(ToAssignmentTarget).ToArray()),
+            _ => throw new InvalidOperationException(
+                $"Invalid assignment target '{expression.GetType().Name}'.")
+        };
+    }
+
+    private static AssignmentTarget ToIndexTarget(IndexExpression index)
+    {
+        if (index.Index is not IndexValue indexValue)
+        {
+            throw new InvalidOperationException("Slice assignment is not supported.");
+        }
+
+        return new IndexTarget(index.Target, indexValue.Value);
+    }
 }
 
 public readonly record struct LineEnding;
 
 public readonly record struct SliceStep(Expression? Step);
+
+public readonly record struct ComprehensionFor(ComprehensionClause Clause);
+
+public readonly record struct ComprehensionQualifier(ComprehensionClause Clause);
 
 public class TAttribute : TerminalAttribute
 {

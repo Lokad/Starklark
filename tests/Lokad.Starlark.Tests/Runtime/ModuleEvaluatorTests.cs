@@ -312,6 +312,62 @@ public sealed class ModuleEvaluatorTests
     }
 
     [Fact]
+    public void ExecutesListAndDictComprehensions()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "values = [2 * x for x in [1, 2, 3] if x > 1]\n" +
+            "mapping = {x: x * x for x in range(3)}\n" +
+            "(values, mapping)\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkTuple(new StarlarkValue[]
+            {
+                new StarlarkList(new StarlarkValue[]
+                {
+                    new StarlarkInt(4),
+                    new StarlarkInt(6)
+                }),
+                new StarlarkDict(new[]
+                {
+                    new KeyValuePair<StarlarkValue, StarlarkValue>(
+                        new StarlarkInt(0),
+                        new StarlarkInt(0)),
+                    new KeyValuePair<StarlarkValue, StarlarkValue>(
+                        new StarlarkInt(1),
+                        new StarlarkInt(1)),
+                    new KeyValuePair<StarlarkValue, StarlarkValue>(
+                        new StarlarkInt(2),
+                        new StarlarkInt(4))
+                })
+            }),
+            result);
+    }
+
+    [Fact]
+    public void RejectsStringIterationInForLoops()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        Assert.Throws<InvalidOperationException>(
+            () => interpreter.ExecuteModule("for x in \"abc\":\n  pass\n", environment));
+    }
+
+    [Fact]
+    public void RejectsStringIterationInComprehensions()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        Assert.Throws<InvalidOperationException>(
+            () => interpreter.ExecuteModule("[x for x in \"abc\"]\n", environment));
+    }
+
+    [Fact]
     public void ExecutesSortedAndMinMax()
     {
         var interpreter = new StarlarkInterpreter();

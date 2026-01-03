@@ -760,12 +760,6 @@ public sealed class ModuleEvaluator
                     yield return item;
                 }
                 yield break;
-            case StarlarkString text:
-                foreach (var ch in text.Value)
-                {
-                    yield return new StarlarkString(ch.ToString());
-                }
-                yield break;
             case StarlarkDict dict:
                 foreach (var entry in dict.Entries)
                 {

@@ -97,29 +97,6 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         return new SimpleStatement(new ExpressionStatement(expression));
     }
 
-    private static AssignmentTarget ToAssignmentTarget(Expression expression)
-    {
-        return expression switch
-        {
-            IdentifierExpression identifier => new NameTarget(identifier.Name),
-            IndexExpression index => ToIndexTarget(index),
-            ListExpression list => new ListTarget(list.Items.Select(ToAssignmentTarget).ToArray()),
-            TupleExpression tuple => new TupleTarget(tuple.Items.Select(ToAssignmentTarget).ToArray()),
-            _ => throw new InvalidOperationException(
-                $"Invalid assignment target '{expression.GetType().Name}'.")
-        };
-    }
-
-    private static AssignmentTarget ToIndexTarget(IndexExpression index)
-    {
-        if (index.Index is not IndexValue indexValue)
-        {
-            throw new InvalidOperationException("Slice assignment is not supported.");
-        }
-
-        return new IndexTarget(index.Target, indexValue.Value);
-    }
-
     [Rule]
     public SimpleStatement ReturnStatement(
         [T(Token.Return)] Token keyword,

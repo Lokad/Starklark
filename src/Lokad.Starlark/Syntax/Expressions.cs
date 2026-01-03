@@ -24,6 +24,27 @@ public sealed record DictExpression(IReadOnlyList<DictEntry> Entries) : Expressi
 
 public sealed record DictEntry(Expression Key, Expression Value);
 
+public sealed record ListComprehensionExpression(
+    Expression Body,
+    IReadOnlyList<ComprehensionClause> Clauses) : Expression;
+
+public sealed record DictComprehensionExpression(
+    Expression Key,
+    Expression Value,
+    IReadOnlyList<ComprehensionClause> Clauses) : Expression;
+
+public sealed record ComprehensionClause(
+    ComprehensionClauseKind Kind,
+    AssignmentTarget? Target,
+    Expression? Iterable,
+    Expression? Condition);
+
+public enum ComprehensionClauseKind
+{
+    For,
+    If
+}
+
 public abstract record IndexSpecifier;
 
 public sealed record IndexValue(Expression Value) : IndexSpecifier;

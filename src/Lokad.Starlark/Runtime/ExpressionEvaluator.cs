@@ -19,6 +19,8 @@ public sealed class ExpressionEvaluator
             ListExpression list => EvaluateList(list, environment),
             TupleExpression tuple => EvaluateTuple(tuple, environment),
             DictExpression dict => EvaluateDict(dict, environment),
+            ListComprehensionExpression listComprehension => EvaluateListComprehension(listComprehension, environment),
+            DictComprehensionExpression dictComprehension => EvaluateDictComprehension(dictComprehension, environment),
             IndexExpression index => EvaluateIndex(index, environment),
             AttributeExpression attribute => EvaluateAttribute(attribute, environment),
             ConditionalExpression conditional => EvaluateConditional(conditional, environment),
@@ -242,6 +244,38 @@ public sealed class ExpressionEvaluator
             entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
         }
 
+        return new StarlarkDict(entries);
+    }
+
+    private StarlarkValue EvaluateListComprehension(
+        ListComprehensionExpression comprehension,
+        StarlarkEnvironment environment)
+    {
+        var result = new List<StarlarkValue>();
+        var scope = environment.CreateChild();
+        EvaluateComprehensionClauses(
+            comprehension.Clauses,
+            scope,
+            () => result.Add(Evaluate(comprehension.Body, scope)));
+        return new StarlarkList(result);
+    }
+
+    private StarlarkValue EvaluateDictComprehension(
+        DictComprehensionExpression comprehension,
+        StarlarkEnvironment environment)
+    {
+        var entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>();
+        var scope = environment.CreateChild();
+        EvaluateComprehensionClauses(
+            comprehension.Clauses,
+            scope,
+            () =>
+            {
+                var key = Evaluate(comprehension.Key, scope);
+                StarlarkHash.EnsureHashable(key);
+                var value = Evaluate(comprehension.Value, scope);
+                entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+            });
         return new StarlarkDict(entries);
     }
 
@@ -843,6 +877,185 @@ public sealed class ExpressionEvaluator
                 isInt = false;
                 return false;
         }
+    }
+
+    private void EvaluateComprehensionClauses(
+        IReadOnlyList<ComprehensionClause> clauses,
+        StarlarkEnvironment environment,
+        Action emit)
+    {
+        EvaluateComprehensionClause(clauses, 0, environment, emit);
+    }
+
+    private void EvaluateComprehensionClause(
+        IReadOnlyList<ComprehensionClause> clauses,
+        int index,
+        StarlarkEnvironment environment,
+        Action emit)
+    {
+        if (index >= clauses.Count)
+        {
+            emit();
+            return;
+        }
+
+        var clause = clauses[index];
+        switch (clause.Kind)
+        {
+            case ComprehensionClauseKind.For:
+                if (clause.Target == null || clause.Iterable == null)
+                {
+                    throw new InvalidOperationException("Invalid comprehension for-clause.");
+                }
+
+                var iterable = Evaluate(clause.Iterable, environment);
+                foreach (var item in EnumerateComprehension(iterable))
+                {
+                    AssignTarget(clause.Target, item, environment);
+                    EvaluateComprehensionClause(clauses, index + 1, environment, emit);
+                }
+                break;
+            case ComprehensionClauseKind.If:
+                if (clause.Condition == null)
+                {
+                    throw new InvalidOperationException("Invalid comprehension if-clause.");
+                }
+
+                var condition = Evaluate(clause.Condition, environment);
+                if (condition.IsTruthy)
+                {
+                    EvaluateComprehensionClause(clauses, index + 1, environment, emit);
+                }
+                break;
+            default:
+                throw new InvalidOperationException("Unsupported comprehension clause.");
+        }
+    }
+
+    private static IEnumerable<StarlarkValue> EnumerateComprehension(StarlarkValue value)
+    {
+        switch (value)
+        {
+            case StarlarkList list:
+                return list.Items;
+            case StarlarkTuple tuple:
+                return tuple.Items;
+            case StarlarkDict dict:
+                return dict.Entries.Select(entry => entry.Key);
+            case StarlarkRange range:
+                return EnumerateRange(range);
+            default:
+                throw new InvalidOperationException(
+                    $"Type '{value.TypeName}' is not iterable.");
+        }
+    }
+
+    private void AssignTarget(AssignmentTarget target, StarlarkValue value, StarlarkEnvironment environment)
+    {
+        switch (target)
+        {
+            case NameTarget nameTarget:
+                environment.Set(nameTarget.Name, value);
+                break;
+            case IndexTarget indexTarget:
+                AssignIndexTarget(indexTarget, value, environment);
+                break;
+            case TupleTarget tupleTarget:
+                AssignSequenceTargets(tupleTarget.Items, value, environment);
+                break;
+            case ListTarget listTarget:
+                AssignSequenceTargets(listTarget.Items, value, environment);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported assignment target '{target.GetType().Name}'.");
+        }
+    }
+
+    private void AssignIndexTarget(IndexTarget target, StarlarkValue value, StarlarkEnvironment environment)
+    {
+        var container = Evaluate(target.Target, environment);
+        var index = Evaluate(target.Index, environment);
+
+        switch (container)
+        {
+            case StarlarkList list:
+                AssignListIndex(list, index, value);
+                break;
+            case StarlarkDict dict:
+                AssignDictIndex(dict, index, value);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Index assignment not supported for '{container.TypeName}'.");
+        }
+    }
+
+    private void AssignSequenceTargets(
+        IReadOnlyList<AssignmentTarget> targets,
+        StarlarkValue value,
+        StarlarkEnvironment environment)
+    {
+        var items = ExtractSequenceItems(value);
+        if (items.Count != targets.Count)
+        {
+            throw new InvalidOperationException(
+                $"Assignment length mismatch. Expected {targets.Count} values but got {items.Count}.");
+        }
+
+        for (var i = 0; i < targets.Count; i++)
+        {
+            AssignTarget(targets[i], items[i], environment);
+        }
+    }
+
+    private static IReadOnlyList<StarlarkValue> ExtractSequenceItems(StarlarkValue value)
+    {
+        return value switch
+        {
+            StarlarkList list => list.Items,
+            StarlarkTuple tuple => tuple.Items,
+            _ => throw new InvalidOperationException(
+                $"Value of type '{value.TypeName}' is not iterable for assignment.")
+        };
+    }
+
+    private static void AssignListIndex(StarlarkList list, StarlarkValue index, StarlarkValue value)
+    {
+        if (index is not StarlarkInt intIndex)
+        {
+            throw new InvalidOperationException(
+                $"Index must be an int, got '{index.TypeName}'.");
+        }
+
+        var position = checked((int)intIndex.Value);
+        if (position < 0)
+        {
+            position = list.Items.Count + position;
+        }
+
+        if (position < 0 || position >= list.Items.Count)
+        {
+            throw new IndexOutOfRangeException("Index out of range.");
+        }
+
+        list.Items[position] = value;
+    }
+
+    private static void AssignDictIndex(StarlarkDict dict, StarlarkValue key, StarlarkValue value)
+    {
+        StarlarkHash.EnsureHashable(key);
+        for (var i = 0; i < dict.Entries.Count; i++)
+        {
+            var entry = dict.Entries[i];
+            if (Equals(entry.Key, key))
+            {
+                dict.Entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(entry.Key, value);
+                return;
+            }
+        }
+
+        dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
     }
 
     private static IEnumerable<StarlarkValue> EnumerateCallArgs(StarlarkValue value)

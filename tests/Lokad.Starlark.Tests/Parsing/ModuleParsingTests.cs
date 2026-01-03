@@ -158,6 +158,31 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void ParsesListComprehension()
+    {
+        var module = StarlarkModuleParser.ParseModule("items = [x for x in [1, 2]]\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var comprehension = Assert.IsType<ListComprehensionExpression>(assignment.Value);
+        Assert.Single(comprehension.Clauses);
+        var clause = comprehension.Clauses[0];
+        Assert.Equal(ComprehensionClauseKind.For, clause.Kind);
+        Assert.IsType<NameTarget>(clause.Target);
+    }
+
+    [Fact]
+    public void ParsesDictComprehension()
+    {
+        var module = StarlarkModuleParser.ParseModule("items = {x: x for x in [1, 2]}\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var comprehension = Assert.IsType<DictComprehensionExpression>(assignment.Value);
+        Assert.Single(comprehension.Clauses);
+    }
+
+    [Fact]
     public void ParsesLoadStatement()
     {
         var module = StarlarkModuleParser.ParseModule("load(\"math\", \"sin\", cosine=\"cos\")\n");
