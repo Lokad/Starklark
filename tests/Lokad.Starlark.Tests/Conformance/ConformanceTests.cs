@@ -40,7 +40,7 @@ public sealed class ConformanceTests
             return;
         }
 
-        var exception = Assert.Throws<Exception>(
+        var exception = Assert.ThrowsAny<Exception>(
             () => interpreter.ExecuteModule(testCase.Source, environment));
         var regex = new Regex(testCase.ExpectedErrorPattern, RegexOptions.Singleline);
         Assert.True(

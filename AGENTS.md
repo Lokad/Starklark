@@ -24,3 +24,4 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 ## Conformance tests
 
 - Conformance scripts live under `tests/Lokad.Starlark.Tests/TestData/Conformance` and use `---` to split independent cases.
+- Inline `### (regex)` after a statement marks the expected error message for the case.
