@@ -305,9 +305,17 @@ public sealed class ModuleEvaluator
         {
             case StarlarkList rightList:
                 list.Items.AddRange(rightList.Items);
+                if (rightList.Items.Count > 0)
+                {
+                    list.MarkMutated();
+                }
                 break;
             case StarlarkTuple rightTuple:
                 list.Items.AddRange(rightTuple.Items);
+                if (rightTuple.Items.Count > 0)
+                {
+                    list.MarkMutated();
+                }
                 break;
             default:
                 throw new InvalidOperationException(
@@ -726,6 +734,7 @@ public sealed class ModuleEvaluator
         }
 
         list.Items[position] = value;
+        list.MarkMutated();
     }
 
     private static void AssignDictIndex(StarlarkDict dict, StarlarkValue key, StarlarkValue value)
@@ -737,11 +746,13 @@ public sealed class ModuleEvaluator
             if (Equals(entry.Key, key))
             {
                 dict.Entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(entry.Key, value);
+                dict.MarkMutated();
                 return;
             }
         }
 
         dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        dict.MarkMutated();
     }
 
     private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)
@@ -749,7 +760,7 @@ public sealed class ModuleEvaluator
         switch (iterable)
         {
             case StarlarkList list:
-                foreach (var item in list.Items)
+                foreach (var item in list.EnumerateWithMutationCheck())
                 {
                     yield return item;
                 }
@@ -761,9 +772,9 @@ public sealed class ModuleEvaluator
                 }
                 yield break;
             case StarlarkDict dict:
-                foreach (var entry in dict.Entries)
+                foreach (var key in dict.EnumerateWithMutationCheck())
                 {
-                    yield return entry.Key;
+                    yield return key;
                 }
                 yield break;
             case StarlarkRange range:

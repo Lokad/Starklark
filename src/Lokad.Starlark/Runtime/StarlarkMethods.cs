@@ -387,7 +387,9 @@ public static class StarlarkMethods
     {
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1, "append");
-        ((StarlarkList)target).Items.Add(args[0]);
+        var list = (StarlarkList)target;
+        list.Items.Add(args[0]);
+        list.MarkMutated();
         return StarlarkNone.Instance;
     }
     private static StarlarkValue ListExtend(
@@ -398,9 +400,16 @@ public static class StarlarkMethods
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1, "extend");
         var list = (StarlarkList)target;
+        var mutated = false;
         foreach (var item in EnumerateIterable(args[0]))
         {
             list.Items.Add(item);
+            mutated = true;
+        }
+
+        if (mutated)
+        {
+            list.MarkMutated();
         }
 
         return StarlarkNone.Instance;
@@ -413,7 +422,9 @@ public static class StarlarkMethods
     {
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 0, "clear");
-        ((StarlarkList)target).Items.Clear();
+        var list = (StarlarkList)target;
+        list.Items.Clear();
+        list.MarkMutated();
         return StarlarkNone.Instance;
     }
     private static StarlarkValue ListInsert(
@@ -426,6 +437,7 @@ public static class StarlarkMethods
         var list = (StarlarkList)target;
         var index = NormalizeInsertIndex(list.Items.Count, RequireInt(args[0]));
         list.Items.Insert(index, args[1]);
+        list.MarkMutated();
         return StarlarkNone.Instance;
     }
     private static StarlarkValue ListRemove(
@@ -441,6 +453,7 @@ public static class StarlarkMethods
             if (Equals(list.Items[i], args[0]))
             {
                 list.Items.RemoveAt(i);
+                list.MarkMutated();
                 return StarlarkNone.Instance;
             }
         }
@@ -469,6 +482,7 @@ public static class StarlarkMethods
             : NormalizeIndex(list.Items.Count, RequireInt(args[0]));
         var value = list.Items[index];
         list.Items.RemoveAt(index);
+        list.MarkMutated();
         return value;
     }
     private static StarlarkValue ListIndex(
@@ -588,6 +602,7 @@ public static class StarlarkMethods
             {
                 var value = dict.Entries[i].Value;
                 dict.Entries.RemoveAt(i);
+                dict.MarkMutated();
                 return value;
             }
         }
@@ -614,6 +629,7 @@ public static class StarlarkMethods
 
         var entry = dict.Entries[0];
         dict.Entries.RemoveAt(0);
+        dict.MarkMutated();
         return new StarlarkTuple(new[] { entry.Key, entry.Value });
     }
     private static StarlarkValue DictClear(
@@ -623,7 +639,9 @@ public static class StarlarkMethods
     {
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 0, "clear");
-        ((StarlarkDict)target).Entries.Clear();
+        var dict = (StarlarkDict)target;
+        dict.Entries.Clear();
+        dict.MarkMutated();
         return StarlarkNone.Instance;
     }
     private static StarlarkValue DictSetDefault(
@@ -650,6 +668,7 @@ public static class StarlarkMethods
 
         var value = args.Count == 2 ? args[1] : StarlarkNone.Instance;
         dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        dict.MarkMutated();
         return value;
     }
     private static StarlarkValue DictUpdate(
@@ -663,13 +682,14 @@ public static class StarlarkMethods
         }
 
         var dict = (StarlarkDict)target;
+        var mutated = false;
         if (args.Count == 1)
         {
             if (args[0] is StarlarkDict other)
             {
                 foreach (var entry in other.Entries)
                 {
-                    AddOrReplace(dict.Entries, entry.Key, entry.Value);
+                    mutated |= AddOrReplace(dict.Entries, entry.Key, entry.Value);
                 }
             }
             else
@@ -682,7 +702,7 @@ public static class StarlarkMethods
                     }
 
                     StarlarkHash.EnsureHashable(key);
-                    AddOrReplace(dict.Entries, key, value);
+                    mutated |= AddOrReplace(dict.Entries, key, value);
                 }
             }
         }
@@ -690,9 +710,13 @@ public static class StarlarkMethods
         foreach (var pair in kwargs)
         {
             var key = new StarlarkString(pair.Key);
-            AddOrReplace(dict.Entries, key, pair.Value);
+            mutated |= AddOrReplace(dict.Entries, key, pair.Value);
         }
 
+        if (mutated)
+        {
+            dict.MarkMutated();
+        }
         return StarlarkNone.Instance;
     }
 
@@ -1058,7 +1082,7 @@ public static class StarlarkMethods
         return false;
     }
 
-    private static void AddOrReplace(
+    private static bool AddOrReplace(
         List<KeyValuePair<StarlarkValue, StarlarkValue>> entries,
         StarlarkValue key,
         StarlarkValue value)
@@ -1068,11 +1092,12 @@ public static class StarlarkMethods
             if (Equals(entries[i].Key, key))
             {
                 entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
-                return;
+                return true;
             }
         }
 
         entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        return true;
     }
 
     private static (int Start, int End) ResolveStartEnd(

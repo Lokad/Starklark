@@ -94,6 +94,23 @@ public sealed class StarlarkList : StarlarkValue
     }
 
     public List<StarlarkValue> Items { get; }
+    internal int Version { get; private set; }
+
+    internal void MarkMutated() => Version++;
+
+    internal IEnumerable<StarlarkValue> EnumerateWithMutationCheck()
+    {
+        var version = Version;
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (version != Version)
+            {
+                throw new InvalidOperationException("Cannot mutate an iterable during iteration.");
+            }
+
+            yield return Items[i];
+        }
+    }
 
     public override string TypeName => "list";
     public override bool IsTruthy => Items.Count != 0;
@@ -157,6 +174,23 @@ public sealed class StarlarkDict : StarlarkValue
     }
 
     public List<KeyValuePair<StarlarkValue, StarlarkValue>> Entries { get; }
+    internal int Version { get; private set; }
+
+    internal void MarkMutated() => Version++;
+
+    internal IEnumerable<StarlarkValue> EnumerateWithMutationCheck()
+    {
+        var version = Version;
+        for (var i = 0; i < Entries.Count; i++)
+        {
+            if (version != Version)
+            {
+                throw new InvalidOperationException("Cannot mutate an iterable during iteration.");
+            }
+
+            yield return Entries[i].Key;
+        }
+    }
 
     public override string TypeName => "dict";
     public override bool IsTruthy => Entries.Count != 0;
@@ -400,6 +434,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
                         new KeyValuePair<StarlarkValue, StarlarkValue>(
                             new StarlarkString(pair.Key),
                             pair.Value));
+                    kwArgsDict.MarkMutated();
                     continue;
                 }
 

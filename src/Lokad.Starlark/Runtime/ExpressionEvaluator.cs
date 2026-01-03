@@ -937,11 +937,11 @@ public sealed class ExpressionEvaluator
         switch (value)
         {
             case StarlarkList list:
-                return list.Items;
+                return list.EnumerateWithMutationCheck();
             case StarlarkTuple tuple:
                 return tuple.Items;
             case StarlarkDict dict:
-                return dict.Entries.Select(entry => entry.Key);
+                return dict.EnumerateWithMutationCheck();
             case StarlarkRange range:
                 return EnumerateRange(range);
             default:
@@ -1040,6 +1040,7 @@ public sealed class ExpressionEvaluator
         }
 
         list.Items[position] = value;
+        list.MarkMutated();
     }
 
     private static void AssignDictIndex(StarlarkDict dict, StarlarkValue key, StarlarkValue value)
@@ -1051,11 +1052,13 @@ public sealed class ExpressionEvaluator
             if (Equals(entry.Key, key))
             {
                 dict.Entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(entry.Key, value);
+                dict.MarkMutated();
                 return;
             }
         }
 
         dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        dict.MarkMutated();
     }
 
     private static IEnumerable<StarlarkValue> EnumerateCallArgs(StarlarkValue value)
