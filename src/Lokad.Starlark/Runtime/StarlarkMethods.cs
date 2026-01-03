@@ -759,11 +759,13 @@ public static class StarlarkMethods
             : text.IndexOf(sep, StringComparison.Ordinal);
         if (index < 0)
         {
+            var prefix = fromRight ? string.Empty : text;
+            var suffix = fromRight ? text : string.Empty;
             return new StarlarkTuple(new StarlarkValue[]
             {
-                new StarlarkString(text),
+                new StarlarkString(prefix),
                 new StarlarkString(string.Empty),
-                new StarlarkString(string.Empty)
+                new StarlarkString(suffix)
             });
         }
 

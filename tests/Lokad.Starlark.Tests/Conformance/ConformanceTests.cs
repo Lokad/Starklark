@@ -11,7 +11,7 @@ public sealed class ConformanceTests
 {
     public static IEnumerable<object[]> GetCases()
     {
-        var root = Path.Combine(AppContext.BaseDirectory, "TestData", "Conformance", "go");
+        var root = Path.Combine(AppContext.BaseDirectory, "TestData", "Conformance");
         if (!Directory.Exists(root))
         {
             yield break;
