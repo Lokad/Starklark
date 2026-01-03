@@ -24,6 +24,7 @@ public sealed class ExpressionEvaluator
             IndexExpression index => EvaluateIndex(index, environment),
             AttributeExpression attribute => EvaluateAttribute(attribute, environment),
             ConditionalExpression conditional => EvaluateConditional(conditional, environment),
+            LambdaExpression lambda => EvaluateLambda(lambda, environment),
             _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unsupported expression.")
         };
     }
@@ -149,6 +150,14 @@ public sealed class ExpressionEvaluator
         return condition.IsTruthy
             ? Evaluate(conditional.ThenExpression, environment)
             : Evaluate(conditional.ElseExpression, environment);
+    }
+
+    private static StarlarkValue EvaluateLambda(LambdaExpression lambda, StarlarkEnvironment environment)
+    {
+        var (names, defaults, varArgsName, kwArgsName) =
+            FunctionParameterEvaluator.Evaluate(lambda.Parameters, environment);
+        var body = new Statement[] { new ReturnStatement(lambda.Body) };
+        return new StarlarkUserFunction("lambda", names, defaults, varArgsName, kwArgsName, body, environment);
     }
 
     private StarlarkValue EvaluateCall(CallExpression call, StarlarkEnvironment environment)

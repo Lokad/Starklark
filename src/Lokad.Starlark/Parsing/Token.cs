@@ -23,6 +23,7 @@ public enum Token
     [Any("True"), F(Id, true)] True,
     [Any("False"), F(Id, true)] False,
     [Any("def"), F(Id, true)] Def,
+    [Any("lambda"), F(Id, true)] Lambda,
     [Any("for"), F(Id, true)] For,
     [Any("if"), F(Id, true)] If,
     [Any("elif"), F(Id, true)] Elif,

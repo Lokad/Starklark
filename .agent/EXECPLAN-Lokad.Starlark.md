@@ -31,6 +31,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 16:15Z) Added zero-argument `bool()`/`float()` behavior and conformance coverage for the builtins subset.
 - [x] (2026-01-03 16:40Z) Added bitwise/shift operators (including unary `+`/`~`) and dict union semantics with conformance coverage.
 - [x] (2026-01-03 18:05Z) Added set type, operators/methods, and conformance coverage.
+- [x] (2026-01-03 18:35Z) Added lambda expressions and conformance coverage.
 
 ## Spec Compliance Checklist
 
@@ -40,6 +41,7 @@ Parsing & Syntax:
 - Support single-quoted strings and raw string literals (`r"..."` / `r'...'`).
 - Parse empty tuple literal `()` and disambiguate parenthesized expressions.
 - Allow conditional expressions in all expression positions (including call arguments).
+- Support lambda expressions. (done)
 - Ensure `load` statements and string literal forms match the spec grammar.
 - Add bytes literals (`b"..."`, `br"..."`, `rb"..."`) and triple-quoted strings/bytes. (done)
 
@@ -270,3 +272,4 @@ Plan revisions:
 - Added java list/string slice subsets plus rust int modulo coverage.
 - Added bytes literals/builtin and string method coverage (capitalize, is* variants, elems).
 - Updated compliance checklist/progress after adding set coverage and operators.
+- Updated compliance checklist/progress after adding lambda expressions.

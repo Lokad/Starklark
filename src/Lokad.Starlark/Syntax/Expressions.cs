@@ -60,6 +60,10 @@ public sealed record ConditionalExpression(
     Expression ThenExpression,
     Expression ElseExpression) : Expression;
 
+public sealed record LambdaExpression(
+    IReadOnlyList<FunctionParameter> Parameters,
+    Expression Body) : Expression;
+
 public enum CallArgumentKind
 {
     Positional,
