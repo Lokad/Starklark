@@ -16,6 +16,7 @@ public static class StarlarkMethods
             StarlarkBytes bytes => BindBytes(bytes, name),
             StarlarkList list => BindList(list, name),
             StarlarkDict dict => BindDict(dict, name),
+            StarlarkSet set => BindSet(set, name),
             _ => throw new InvalidOperationException(
                 $"Object of type '{target.TypeName}' has no attribute '{name}'.")
         };
@@ -101,6 +102,31 @@ public static class StarlarkMethods
             "clear" => new StarlarkBoundMethod(name, target, DictClear),
             "setdefault" => new StarlarkBoundMethod(name, target, DictSetDefault),
             "update" => new StarlarkBoundMethod(name, target, DictUpdate),
+            _ => throw new InvalidOperationException(
+                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+        };
+    }
+
+    private static StarlarkValue BindSet(StarlarkSet target, string name)
+    {
+        return name switch
+        {
+            "add" => new StarlarkBoundMethod(name, target, SetAdd),
+            "clear" => new StarlarkBoundMethod(name, target, SetClear),
+            "difference" => new StarlarkBoundMethod(name, target, SetDifference),
+            "difference_update" => new StarlarkBoundMethod(name, target, SetDifferenceUpdate),
+            "discard" => new StarlarkBoundMethod(name, target, SetDiscard),
+            "intersection" => new StarlarkBoundMethod(name, target, SetIntersection),
+            "intersection_update" => new StarlarkBoundMethod(name, target, SetIntersectionUpdate),
+            "isdisjoint" => new StarlarkBoundMethod(name, target, SetIsDisjoint),
+            "issubset" => new StarlarkBoundMethod(name, target, SetIsSubset),
+            "issuperset" => new StarlarkBoundMethod(name, target, SetIsSuperset),
+            "pop" => new StarlarkBoundMethod(name, target, SetPop),
+            "remove" => new StarlarkBoundMethod(name, target, SetRemove),
+            "symmetric_difference" => new StarlarkBoundMethod(name, target, SetSymmetricDifference),
+            "symmetric_difference_update" => new StarlarkBoundMethod(name, target, SetSymmetricDifferenceUpdate),
+            "union" => new StarlarkBoundMethod(name, target, SetUnion),
+            "update" => new StarlarkBoundMethod(name, target, SetUpdate),
             _ => throw new InvalidOperationException(
                 $"Object of type '{target.TypeName}' has no attribute '{name}'.")
         };
@@ -1023,6 +1049,337 @@ public static class StarlarkMethods
         return StarlarkNone.Instance;
     }
 
+    private static StarlarkValue SetAdd(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "add");
+        var set = (StarlarkSet)target;
+        StarlarkHash.EnsureHashable(args[0]);
+        set.AddValue(args[0]);
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetClear(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "clear");
+        var set = (StarlarkSet)target;
+        if (set.Items.Count > 0)
+        {
+            set.Items.Clear();
+            set.MarkMutated();
+        }
+
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetDiscard(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "discard");
+        var set = (StarlarkSet)target;
+        StarlarkHash.EnsureHashable(args[0]);
+        set.RemoveValue(args[0]);
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetRemove(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "remove");
+        var set = (StarlarkSet)target;
+        StarlarkHash.EnsureHashable(args[0]);
+        if (!set.RemoveValue(args[0]))
+        {
+            throw new InvalidOperationException("element not found.");
+        }
+
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetPop(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "pop");
+        var set = (StarlarkSet)target;
+        if (set.Items.Count == 0)
+        {
+            throw new InvalidOperationException("pop from empty set.");
+        }
+
+        var value = set.Items[0];
+        set.Items.RemoveAt(0);
+        set.MarkMutated();
+        return value;
+    }
+
+    private static StarlarkValue SetUpdate(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "update");
+        var set = (StarlarkSet)target;
+        foreach (var item in EnumerateIterable(args[0]))
+        {
+            StarlarkHash.EnsureHashable(item);
+            set.AddValue(item);
+        }
+
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetUnion(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "union");
+        var set = (StarlarkSet)target;
+        var result = new List<StarlarkValue>(set.Items);
+        foreach (var item in EnumerateIterable(args[0]))
+        {
+            StarlarkHash.EnsureHashable(item);
+            AddIfMissing(result, item);
+        }
+
+        return new StarlarkSet(result);
+    }
+
+    private static StarlarkValue SetIntersection(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "intersection");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        var result = new List<StarlarkValue>();
+        foreach (var item in set.Items)
+        {
+            if (ContainsValue(other, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        return new StarlarkSet(result);
+    }
+
+    private static StarlarkValue SetDifference(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "difference");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        var result = new List<StarlarkValue>();
+        foreach (var item in set.Items)
+        {
+            if (!ContainsValue(other, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        return new StarlarkSet(result);
+    }
+
+    private static StarlarkValue SetSymmetricDifference(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "symmetric_difference");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        var result = new List<StarlarkValue>();
+        foreach (var item in set.Items)
+        {
+            if (!ContainsValue(other, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        foreach (var item in other)
+        {
+            if (!ContainsValue(set.Items, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        return new StarlarkSet(result);
+    }
+
+    private static StarlarkValue SetDifferenceUpdate(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "difference_update");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        var mutated = false;
+        for (var i = set.Items.Count - 1; i >= 0; i--)
+        {
+            if (ContainsValue(other, set.Items[i]))
+            {
+                set.Items.RemoveAt(i);
+                mutated = true;
+            }
+        }
+
+        if (mutated)
+        {
+            set.MarkMutated();
+        }
+
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetIntersectionUpdate(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "intersection_update");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        var mutated = false;
+        for (var i = set.Items.Count - 1; i >= 0; i--)
+        {
+            if (!ContainsValue(other, set.Items[i]))
+            {
+                set.Items.RemoveAt(i);
+                mutated = true;
+            }
+        }
+
+        if (mutated)
+        {
+            set.MarkMutated();
+        }
+
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetSymmetricDifferenceUpdate(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "symmetric_difference_update");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        var result = new List<StarlarkValue>();
+        foreach (var item in set.Items)
+        {
+            if (!ContainsValue(other, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        foreach (var item in other)
+        {
+            if (!ContainsValue(set.Items, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        set.Items.Clear();
+        set.Items.AddRange(result);
+        set.MarkMutated();
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue SetIsDisjoint(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "isdisjoint");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        foreach (var item in set.Items)
+        {
+            if (ContainsValue(other, item))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
+    }
+
+    private static StarlarkValue SetIsSubset(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "issubset");
+        var set = (StarlarkSet)target;
+        var other = CollectUniqueHashable(args[0]);
+        foreach (var item in set.Items)
+        {
+            if (!ContainsValue(other, item))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
+    }
+
+    private static StarlarkValue SetIsSuperset(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "issuperset");
+        var set = (StarlarkSet)target;
+        foreach (var item in EnumerateIterable(args[0]))
+        {
+            StarlarkHash.EnsureHashable(item);
+            if (!ContainsValue(set.Items, item))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
+    }
+
     private static StarlarkValue StartsEndsWith(
         StarlarkValue target,
         IReadOnlyList<StarlarkValue> args,
@@ -1503,6 +1860,8 @@ public static class StarlarkMethods
                 return tuple.Items;
             case StarlarkDict dict:
                 return dict.Entries.Select(entry => entry.Key);
+            case StarlarkSet set:
+                return set.Items;
             case StarlarkRange range:
                 return EnumerateRange(range);
             case StarlarkStringElems elems:
@@ -1587,6 +1946,39 @@ public static class StarlarkMethods
 
         entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
         return true;
+    }
+
+    private static List<StarlarkValue> CollectUniqueHashable(StarlarkValue value)
+    {
+        var result = new List<StarlarkValue>();
+        foreach (var item in EnumerateIterable(value))
+        {
+            StarlarkHash.EnsureHashable(item);
+            AddIfMissing(result, item);
+        }
+
+        return result;
+    }
+
+    private static bool ContainsValue(IReadOnlyList<StarlarkValue> items, StarlarkValue value)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (StarlarkEquality.AreEqual(items[i], value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void AddIfMissing(List<StarlarkValue> items, StarlarkValue value)
+    {
+        if (!ContainsValue(items, value))
+        {
+            items.Add(value);
+        }
     }
 
     private static (int Start, int End) ResolveStartEnd(

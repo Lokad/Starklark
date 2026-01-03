@@ -8,6 +8,7 @@ public static class StarlarkHash
         {
             case StarlarkList:
             case StarlarkDict:
+            case StarlarkSet:
                 throw new InvalidOperationException(
                     $"unhashable type: '{value.TypeName}'.");
             case StarlarkTuple tuple:

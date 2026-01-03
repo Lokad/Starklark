@@ -74,6 +74,11 @@ internal static class StarlarkEquality
             return DictEquals(leftDict, rightDict, active);
         }
 
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return SetEquals(leftSet, rightSet, active);
+        }
+
         return false;
     }
 
@@ -169,6 +174,59 @@ internal static class StarlarkEquality
 
         value = StarlarkNone.Instance;
         return false;
+    }
+
+    private static bool SetEquals(
+        StarlarkSet left,
+        StarlarkSet right,
+        HashSet<ReferencePair> active)
+    {
+        if (left.Items.Count != right.Items.Count)
+        {
+            return false;
+        }
+
+        var pair = new ReferencePair(left, right);
+        if (!active.Add(pair))
+        {
+            throw new InvalidOperationException(RecursionError);
+        }
+
+        try
+        {
+            var matched = new bool[right.Items.Count];
+            for (var i = 0; i < left.Items.Count; i++)
+            {
+                var found = false;
+                for (var j = 0; j < right.Items.Count; j++)
+                {
+                    if (matched[j])
+                    {
+                        continue;
+                    }
+
+                    if (!AreEqualInternal(left.Items[i], right.Items[j], active))
+                    {
+                        continue;
+                    }
+
+                    matched[j] = true;
+                    found = true;
+                    break;
+                }
+
+                if (!found)
+                {
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            active.Remove(pair);
+        }
+
+        return true;
     }
 
     private readonly struct ReferencePair : IEquatable<ReferencePair>

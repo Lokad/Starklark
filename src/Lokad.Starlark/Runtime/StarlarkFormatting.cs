@@ -92,6 +92,7 @@ public static class StarlarkFormatting
             StarlarkList list => FormatList(list, state),
             StarlarkTuple tuple => FormatTuple(tuple, state),
             StarlarkDict dict => FormatDict(dict, state),
+            StarlarkSet set => FormatSet(set, state),
             StarlarkRange range => FormatRange(range),
             StarlarkStringElems elems => $"{Quote(elems.Value)}.elems()",
             StarlarkBytesElems elems => $"{FormatBytesLiteral(elems.Bytes)}.elems()",
@@ -169,6 +170,31 @@ public static class StarlarkFormatting
 
         builder.Append('}');
         state.Exit(dict);
+        return builder.ToString();
+    }
+
+    private static string FormatSet(StarlarkSet set, FormattingState state)
+    {
+        if (set.Items.Count == 0)
+        {
+            return "set()";
+        }
+
+        state.Enter(set);
+        var builder = new StringBuilder();
+        builder.Append("set([");
+        for (var i = 0; i < set.Items.Count; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(", ");
+            }
+
+            builder.Append(Format(set.Items[i], quoteStrings: true, state));
+        }
+
+        builder.Append("])");
+        state.Exit(set);
         return builder.ToString();
     }
 

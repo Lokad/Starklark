@@ -624,6 +624,7 @@ public sealed class ExpressionEvaluator
             StarlarkList list => ContainsValue(list.Items, item),
             StarlarkTuple tuple => ContainsValue(tuple.Items, item),
             StarlarkDict dict => IsInDict(item, dict),
+            StarlarkSet set => IsInSet(item, set),
             StarlarkString text when item is StarlarkString needle =>
                 text.Value.Contains(needle.Value, StringComparison.Ordinal),
             StarlarkBytes bytes when item is StarlarkInt intValue =>
@@ -641,6 +642,12 @@ public sealed class ExpressionEvaluator
     {
         StarlarkHash.EnsureHashable(item);
         return dict.Entries.Any(entry => Equals(entry.Key, item));
+    }
+
+    private static bool IsInSet(StarlarkValue item, StarlarkSet set)
+    {
+        StarlarkHash.EnsureHashable(item);
+        return set.Contains(item);
     }
 
     private static bool IsInBytes(long value, byte[] bytes)
@@ -719,7 +726,7 @@ public sealed class ExpressionEvaluator
     {
         for (var i = 0; i < items.Count; i++)
         {
-            if (Equals(items[i], item))
+            if (StarlarkEquality.AreEqual(items[i], item))
             {
                 return true;
             }
@@ -932,6 +939,11 @@ public sealed class ExpressionEvaluator
 
     private static StarlarkValue Subtract(StarlarkValue left, StarlarkValue right)
     {
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return DifferenceSet(leftSet, rightSet);
+        }
+
         if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
             return new StarlarkInt(leftInt.Value - rightInt.Value);
@@ -1172,6 +1184,11 @@ public sealed class ExpressionEvaluator
             return UnionDict(leftDict, rightDict);
         }
 
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return UnionSet(leftSet, rightSet);
+        }
+
         throw new InvalidOperationException(
             $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
@@ -1183,6 +1200,11 @@ public sealed class ExpressionEvaluator
             return new StarlarkInt(leftInt.Value ^ rightInt.Value);
         }
 
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return SymmetricDifferenceSet(leftSet, rightSet);
+        }
+
         throw new InvalidOperationException(
             $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
@@ -1192,6 +1214,11 @@ public sealed class ExpressionEvaluator
         if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
             return new StarlarkInt(leftInt.Value & rightInt.Value);
+        }
+
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return IntersectionSet(leftSet, rightSet);
         }
 
         throw new InvalidOperationException(
@@ -1241,6 +1268,70 @@ public sealed class ExpressionEvaluator
         }
 
         return new StarlarkDict(entries);
+    }
+
+    private static StarlarkSet UnionSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>(left.Items);
+        foreach (var item in right.Items)
+        {
+            if (!ContainsValue(items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
+    }
+
+    private static StarlarkSet IntersectionSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>();
+        foreach (var item in left.Items)
+        {
+            if (ContainsValue(right.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
+    }
+
+    private static StarlarkSet DifferenceSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>();
+        foreach (var item in left.Items)
+        {
+            if (!ContainsValue(right.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
+    }
+
+    private static StarlarkSet SymmetricDifferenceSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>();
+        foreach (var item in left.Items)
+        {
+            if (!ContainsValue(right.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        foreach (var item in right.Items)
+        {
+            if (!ContainsValue(left.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
     }
 
     private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
@@ -1325,6 +1416,8 @@ public sealed class ExpressionEvaluator
                 return tuple.Items;
             case StarlarkDict dict:
                 return dict.EnumerateWithMutationCheck();
+            case StarlarkSet set:
+                return set.EnumerateWithMutationCheck();
             case StarlarkStringElems elems:
                 return elems.Enumerate();
             case StarlarkBytesElems elems:

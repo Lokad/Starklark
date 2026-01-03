@@ -277,6 +277,29 @@ public sealed class ModuleEvaluator
             return;
         }
 
+        if (existing is StarlarkSet set)
+        {
+            switch (assignment.Operator)
+            {
+                case BinaryOperator.BitwiseOr:
+                    UnionSetInPlace(set, right);
+                    environment.Set(target.Name, set);
+                    return;
+                case BinaryOperator.BitwiseAnd:
+                    IntersectionSetInPlace(set, right);
+                    environment.Set(target.Name, set);
+                    return;
+                case BinaryOperator.BitwiseXor:
+                    SymmetricDifferenceSetInPlace(set, right);
+                    environment.Set(target.Name, set);
+                    return;
+                case BinaryOperator.Subtract:
+                    DifferenceSetInPlace(set, right);
+                    environment.Set(target.Name, set);
+                    return;
+            }
+        }
+
         var result = ApplyBinaryOperator(assignment.Operator, existing, right);
         environment.Set(target.Name, result);
     }
@@ -462,6 +485,11 @@ public sealed class ModuleEvaluator
 
     private static StarlarkValue Subtract(StarlarkValue left, StarlarkValue right)
     {
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return DifferenceSet(leftSet, rightSet);
+        }
+
         if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
             return new StarlarkInt(leftInt.Value - rightInt.Value);
@@ -627,6 +655,11 @@ public sealed class ModuleEvaluator
             return UnionDict(leftDict, rightDict);
         }
 
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return UnionSet(leftSet, rightSet);
+        }
+
         throw new InvalidOperationException(
             $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
@@ -638,6 +671,11 @@ public sealed class ModuleEvaluator
             return new StarlarkInt(leftInt.Value ^ rightInt.Value);
         }
 
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return SymmetricDifferenceSet(leftSet, rightSet);
+        }
+
         throw new InvalidOperationException(
             $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
@@ -647,6 +685,11 @@ public sealed class ModuleEvaluator
         if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
             return new StarlarkInt(leftInt.Value & rightInt.Value);
+        }
+
+        if (left is StarlarkSet leftSet && right is StarlarkSet rightSet)
+        {
+            return IntersectionSet(leftSet, rightSet);
         }
 
         throw new InvalidOperationException(
@@ -696,6 +739,70 @@ public sealed class ModuleEvaluator
         }
 
         return new StarlarkDict(entries);
+    }
+
+    private static StarlarkSet UnionSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>(left.Items);
+        foreach (var item in right.Items)
+        {
+            if (!ContainsValue(items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
+    }
+
+    private static StarlarkSet IntersectionSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>();
+        foreach (var item in left.Items)
+        {
+            if (ContainsValue(right.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
+    }
+
+    private static StarlarkSet DifferenceSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>();
+        foreach (var item in left.Items)
+        {
+            if (!ContainsValue(right.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
+    }
+
+    private static StarlarkSet SymmetricDifferenceSet(StarlarkSet left, StarlarkSet right)
+    {
+        var items = new List<StarlarkValue>();
+        foreach (var item in left.Items)
+        {
+            if (!ContainsValue(right.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        foreach (var item in right.Items)
+        {
+            if (!ContainsValue(left.Items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
     }
 
     private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
@@ -871,6 +978,98 @@ public sealed class ModuleEvaluator
         }
     }
 
+    private static void UnionSetInPlace(StarlarkSet set, StarlarkValue right)
+    {
+        if (right is not StarlarkSet other)
+        {
+            throw new InvalidOperationException(
+                $"Operator '|=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
+        }
+
+        for (var i = 0; i < other.Items.Count; i++)
+        {
+            set.AddValue(other.Items[i]);
+        }
+    }
+
+    private static void IntersectionSetInPlace(StarlarkSet set, StarlarkValue right)
+    {
+        if (right is not StarlarkSet other)
+        {
+            throw new InvalidOperationException(
+                $"Operator '&=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
+        }
+
+        var mutated = false;
+        for (var i = set.Items.Count - 1; i >= 0; i--)
+        {
+            if (!ContainsValue(other.Items, set.Items[i]))
+            {
+                set.Items.RemoveAt(i);
+                mutated = true;
+            }
+        }
+
+        if (mutated)
+        {
+            set.MarkMutated();
+        }
+    }
+
+    private static void DifferenceSetInPlace(StarlarkSet set, StarlarkValue right)
+    {
+        if (right is not StarlarkSet other)
+        {
+            throw new InvalidOperationException(
+                $"Operator '-=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
+        }
+
+        var mutated = false;
+        for (var i = set.Items.Count - 1; i >= 0; i--)
+        {
+            if (ContainsValue(other.Items, set.Items[i]))
+            {
+                set.Items.RemoveAt(i);
+                mutated = true;
+            }
+        }
+
+        if (mutated)
+        {
+            set.MarkMutated();
+        }
+    }
+
+    private static void SymmetricDifferenceSetInPlace(StarlarkSet set, StarlarkValue right)
+    {
+        if (right is not StarlarkSet other)
+        {
+            throw new InvalidOperationException(
+                $"Operator '^=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
+        }
+
+        var result = new List<StarlarkValue>();
+        foreach (var item in set.Items)
+        {
+            if (!ContainsValue(other.Items, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        foreach (var item in other.Items)
+        {
+            if (!ContainsValue(set.Items, item))
+            {
+                result.Add(item);
+            }
+        }
+
+        set.Items.Clear();
+        set.Items.AddRange(result);
+        set.MarkMutated();
+    }
+
     private static bool AddOrReplace(
         List<KeyValuePair<StarlarkValue, StarlarkValue>> entries,
         StarlarkValue key,
@@ -887,6 +1086,19 @@ public sealed class ModuleEvaluator
 
         entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
         return true;
+    }
+
+    private static bool ContainsValue(IReadOnlyList<StarlarkValue> items, StarlarkValue value)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (StarlarkEquality.AreEqual(items[i], value))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)
@@ -909,6 +1121,12 @@ public sealed class ModuleEvaluator
                 foreach (var key in dict.EnumerateWithMutationCheck())
                 {
                     yield return key;
+                }
+                yield break;
+            case StarlarkSet set:
+                foreach (var item in set.EnumerateWithMutationCheck())
+                {
+                    yield return item;
                 }
                 yield break;
             case StarlarkStringElems elems:

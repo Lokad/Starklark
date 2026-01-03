@@ -265,7 +265,86 @@ public sealed class StarlarkDict : StarlarkValue
     {
         throw new InvalidOperationException("unhashable type: 'dict'.");
     }
+}
 
+public sealed class StarlarkSet : StarlarkValue
+{
+    public StarlarkSet(IEnumerable<StarlarkValue> items)
+    {
+        Items = new List<StarlarkValue>(items);
+    }
+
+    public List<StarlarkValue> Items { get; }
+    internal int Version { get; private set; }
+
+    internal void MarkMutated() => Version++;
+
+    internal IEnumerable<StarlarkValue> EnumerateWithMutationCheck()
+    {
+        var version = Version;
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (version != Version)
+            {
+                throw new InvalidOperationException("Cannot mutate an iterable during iteration.");
+            }
+
+            yield return Items[i];
+        }
+    }
+
+    public override string TypeName => "set";
+    public override bool IsTruthy => Items.Count != 0;
+
+    public bool Contains(StarlarkValue value)
+    {
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (StarlarkEquality.AreEqual(Items[i], value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool AddValue(StarlarkValue value)
+    {
+        if (Contains(value))
+        {
+            return false;
+        }
+
+        Items.Add(value);
+        MarkMutated();
+        return true;
+    }
+
+    public bool RemoveValue(StarlarkValue value)
+    {
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (StarlarkEquality.AreEqual(Items[i], value))
+            {
+                Items.RemoveAt(i);
+                MarkMutated();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is StarlarkSet other && StarlarkEquality.AreEqual(this, other);
+    }
+
+    public override int GetHashCode()
+    {
+        throw new InvalidOperationException("unhashable type: 'set'.");
+    }
 }
 
 public sealed class StarlarkRange : StarlarkValue, IEquatable<StarlarkRange>

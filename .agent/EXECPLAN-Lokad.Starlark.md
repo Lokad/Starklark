@@ -30,6 +30,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 16:00Z) Added hash builtin, whitespace-aware string splitting, and missing string methods (`index`, `rindex`, `isalnum`, `isalpha`, `isdigit`, `removeprefix`, `removesuffix`) plus updated conformance coverage.
 - [x] (2026-01-03 16:15Z) Added zero-argument `bool()`/`float()` behavior and conformance coverage for the builtins subset.
 - [x] (2026-01-03 16:40Z) Added bitwise/shift operators (including unary `+`/`~`) and dict union semantics with conformance coverage.
+- [x] (2026-01-03 18:05Z) Added set type, operators/methods, and conformance coverage.
 
 ## Spec Compliance Checklist
 
@@ -52,6 +53,7 @@ Core Semantics:
 Builtins & Methods:
 - Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
 - Complete string/list/dict methods per spec, including argument validation and error messages.
+- Implement set type and set builtins/methods/operators. (done)
 - Verify `%` formatting and `str.format` behaviors with spec-aligned edge cases.
 - Add `bytes` builtin, `bytes.elems`, and missing string methods (`capitalize`, `elems`, `islower`, `istitle`, `isupper`, `isspace`). (done)
 
@@ -267,3 +269,4 @@ Plan revisions:
 - Added NaN comparison coverage and recursion guards for equality/`repr`.
 - Added java list/string slice subsets plus rust int modulo coverage.
 - Added bytes literals/builtin and string method coverage (capitalize, is* variants, elems).
+- Updated compliance checklist/progress after adding set coverage and operators.

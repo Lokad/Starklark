@@ -16,6 +16,7 @@ public static class StarlarkBuiltins
         environment.AddFunction("any", Any, isBuiltin: true);
         environment.AddFunction("all", All, isBuiltin: true);
         environment.AddFunction("dict", Dict, isBuiltin: true);
+        environment.AddFunction("set", Set, isBuiltin: true);
         environment.AddFunction("str", Str, isBuiltin: true);
         environment.AddFunction("int", Int, isBuiltin: true);
         environment.AddFunction("float", Float, isBuiltin: true);
@@ -49,6 +50,7 @@ public static class StarlarkBuiltins
             StarlarkList list => new StarlarkInt(list.Items.Count),
             StarlarkTuple tuple => new StarlarkInt(tuple.Items.Count),
             StarlarkDict dict => new StarlarkInt(dict.Entries.Count),
+            StarlarkSet set => new StarlarkInt(set.Items.Count),
             StarlarkRange range => new StarlarkInt(range.Count),
             _ => throw new InvalidOperationException($"Object of type '{args[0].TypeName}' has no len.")
         };
@@ -211,6 +213,30 @@ public static class StarlarkBuiltins
         }
 
         return new StarlarkDict(entries);
+    }
+
+    private static StarlarkValue Set(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        if (args.Count == 0)
+        {
+            return new StarlarkSet(Array.Empty<StarlarkValue>());
+        }
+
+        ExpectArgCount(args, 1);
+        var items = new List<StarlarkValue>();
+        foreach (var item in Enumerate(args[0]))
+        {
+            StarlarkHash.EnsureHashable(item);
+            if (!Contains(items, item))
+            {
+                items.Add(item);
+            }
+        }
+
+        return new StarlarkSet(items);
     }
 
     private static StarlarkValue Str(
@@ -860,6 +886,25 @@ public static class StarlarkBuiltins
                 "update",
                 "values"
             },
+            StarlarkSet => new List<string>
+            {
+                "add",
+                "clear",
+                "difference",
+                "difference_update",
+                "discard",
+                "intersection",
+                "intersection_update",
+                "isdisjoint",
+                "issubset",
+                "issuperset",
+                "pop",
+                "remove",
+                "symmetric_difference",
+                "symmetric_difference_update",
+                "union",
+                "update"
+            },
             _ => new List<string>()
         };
     }
@@ -871,6 +916,7 @@ public static class StarlarkBuiltins
             StarlarkList list => list.Items,
             StarlarkTuple tuple => tuple.Items,
             StarlarkDict dict => EnumerateDictKeys(dict),
+            StarlarkSet set => set.Items,
             StarlarkRange range => EnumerateRange(range),
             _ => throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.")
         };
@@ -908,6 +954,8 @@ public static class StarlarkBuiltins
                 return tuple.Items;
             case StarlarkDict dict:
                 return EnumerateDictKeys(dict);
+            case StarlarkSet set:
+                return set.Items;
             case StarlarkRange range:
                 return EnumerateRange(range);
             case StarlarkStringElems elems:
@@ -1036,6 +1084,19 @@ public static class StarlarkBuiltins
         }
 
         entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+    }
+
+    private static bool Contains(List<StarlarkValue> items, StarlarkValue value)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (StarlarkEquality.AreEqual(items[i], value))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryParseInt(string text, int baseValue, out long value)
