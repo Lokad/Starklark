@@ -10,6 +10,7 @@ public sealed class ExpressionEvaluator
 {
     public StarlarkValue Evaluate(Expression expression, StarlarkEnvironment environment)
     {
+        environment.Guard.Check();
         return expression switch
         {
             LiteralExpression literal => ConvertLiteral(literal.Value),
@@ -915,6 +916,7 @@ public sealed class ExpressionEvaluator
                 var iterable = Evaluate(clause.Iterable, environment);
                 foreach (var item in EnumerateComprehension(iterable, clause.Span))
                 {
+                    environment.Guard.Check();
                     AssignTarget(clause.Target, item, environment);
                     EvaluateComprehensionClause(clauses, index + 1, environment, emit);
                 }

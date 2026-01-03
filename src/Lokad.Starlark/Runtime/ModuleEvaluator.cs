@@ -55,6 +55,7 @@ public sealed class ModuleEvaluator
 
         foreach (var statement in statements)
         {
+            environment.Guard.Check();
             switch (statement)
             {
                 case AssignmentStatement assignment:

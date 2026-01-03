@@ -9,6 +9,7 @@ public sealed class StarlarkEnvironment
     private readonly Dictionary<string, StarlarkValue> _locals;
     private readonly IReadOnlySet<string>? _declaredLocals;
     private readonly Stack<IReadOnlyList<Statement>> _callStack;
+    private ExecutionGuard _guard;
 
     public StarlarkEnvironment? Parent { get; }
 
@@ -35,6 +36,7 @@ public sealed class StarlarkEnvironment
             ? new Stack<IReadOnlyList<Statement>>()
             : parent._callStack;
         _declaredLocals = declaredLocals;
+        _guard = parent?._guard ?? ExecutionGuard.None;
 
         if (parent == null)
         {
@@ -45,6 +47,20 @@ public sealed class StarlarkEnvironment
     public StarlarkEnvironment CreateChild(IReadOnlySet<string>? declaredLocals = null)
     {
         return new StarlarkEnvironment(this, declaredLocals);
+    }
+
+    internal ExecutionGuard Guard => Parent?.Guard ?? _guard;
+
+    internal ExecutionGuard SwapGuard(ExecutionGuard guard)
+    {
+        if (Parent != null)
+        {
+            return Parent.SwapGuard(guard);
+        }
+
+        var previous = _guard;
+        _guard = guard;
+        return previous;
     }
 
     public void Set(string name, StarlarkValue value)
