@@ -431,7 +431,7 @@ public sealed class ModuleEvaluatorTests
         var interpreter = new StarlarkInterpreter();
         var environment = new StarlarkEnvironment();
 
-        Assert.Throws<InvalidOperationException>(
+        Assert.Throws<StarlarkRuntimeException>(
             () => interpreter.ExecuteModule("for x in \"abc\":\n  pass\n", environment));
     }
 
@@ -441,7 +441,7 @@ public sealed class ModuleEvaluatorTests
         var interpreter = new StarlarkInterpreter();
         var environment = new StarlarkEnvironment();
 
-        Assert.Throws<InvalidOperationException>(
+        Assert.Throws<StarlarkRuntimeException>(
             () => interpreter.ExecuteModule("[x for x in \"abc\"]\n", environment));
     }
 

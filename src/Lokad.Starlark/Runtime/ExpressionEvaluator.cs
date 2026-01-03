@@ -41,7 +41,7 @@ public sealed class ExpressionEvaluator
             float f => new StarlarkFloat(f),
             string s => new StarlarkString(s),
             byte[] bytes => new StarlarkBytes(bytes),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Unsupported literal type: {value.GetType().Name}.")
         };
     }
@@ -50,7 +50,7 @@ public sealed class ExpressionEvaluator
     {
         if (!environment.TryGet(identifier.Name, out var value))
         {
-            throw new KeyNotFoundException($"Undefined identifier '{identifier.Name}'.");
+            RuntimeErrors.Throw($"Undefined identifier '{identifier.Name}'.");
         }
 
         return value;
@@ -76,7 +76,7 @@ public sealed class ExpressionEvaluator
         {
             StarlarkInt value => new StarlarkInt(-value.Value),
             StarlarkFloat value => new StarlarkFloat(-value.Value),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Unary '-' not supported for type '{operand.TypeName}'.")
         };
     }
@@ -87,7 +87,7 @@ public sealed class ExpressionEvaluator
         {
             StarlarkInt => operand,
             StarlarkFloat => operand,
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Unary '+' not supported for type '{operand.TypeName}'.")
         };
     }
@@ -97,7 +97,7 @@ public sealed class ExpressionEvaluator
         return operand switch
         {
             StarlarkInt value => new StarlarkInt(~value.Value),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Unary '~' not supported for type '{operand.TypeName}'.")
         };
     }
@@ -172,10 +172,10 @@ public sealed class ExpressionEvaluator
     private StarlarkValue EvaluateCall(CallExpression call, StarlarkEnvironment environment)
     {
         var callee = Evaluate(call.Callee, environment);
-        if (callee is not StarlarkCallable function)
+        var function = callee as StarlarkCallable;
+        if (function == null)
         {
-            throw new InvalidOperationException(
-                $"Attempted to call non-callable value of type '{callee.TypeName}'.");
+            RuntimeErrors.Throw($"Attempted to call non-callable value of type '{callee.TypeName}'.");
         }
 
         var args = new List<StarlarkValue>(call.Arguments.Count);
@@ -192,8 +192,7 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.Positional:
                     if (seenKeyword || seenStar)
                     {
-                        throw new InvalidOperationException(
-                            "Positional argument follows keyword or *args argument.");
+                        RuntimeErrors.Throw("Positional argument follows keyword or *args argument.");
                     }
 
                     args.Add(Evaluate(argument.Value, environment));
@@ -201,20 +200,18 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.Keyword:
                     if (seenStarStar)
                     {
-                        throw new InvalidOperationException(
-                            "Keyword argument follows **kwargs argument.");
+                        RuntimeErrors.Throw("Keyword argument follows **kwargs argument.");
                     }
 
                     seenKeyword = true;
                     if (argument.Name == null)
                     {
-                        throw new InvalidOperationException("Keyword argument missing name.");
+                        RuntimeErrors.Throw("Keyword argument missing name.");
                     }
 
                     if (kwargs.ContainsKey(argument.Name))
                     {
-                        throw new InvalidOperationException(
-                            $"Got multiple values for keyword argument '{argument.Name}'.");
+                        RuntimeErrors.Throw($"Got multiple values for keyword argument '{argument.Name}'.");
                     }
 
                     kwargs[argument.Name] = Evaluate(argument.Value, environment);
@@ -222,14 +219,12 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.Star:
                     if (seenKeyword)
                     {
-                        throw new InvalidOperationException(
-                            "*args argument follows keyword argument.");
+                        RuntimeErrors.Throw("*args argument follows keyword argument.");
                     }
 
                     if (seenStarStar)
                     {
-                        throw new InvalidOperationException(
-                            "*args argument follows **kwargs argument.");
+                        RuntimeErrors.Throw("*args argument follows **kwargs argument.");
                     }
 
                     seenStar = true;
@@ -241,8 +236,7 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.StarStar:
                     if (seenStarStar)
                     {
-                        throw new InvalidOperationException(
-                            "Multiple **kwargs arguments are not allowed.");
+                        RuntimeErrors.Throw("Multiple **kwargs arguments are not allowed.");
                     }
 
                     seenKeyword = true;
@@ -250,7 +244,8 @@ public sealed class ExpressionEvaluator
                     MergeKwArgs(kwargs, Evaluate(argument.Value, environment));
                     break;
                 default:
-                    throw new InvalidOperationException("Unsupported call argument.");
+                    RuntimeErrors.Throw("Unsupported call argument.");
+                    break;
             }
         }
 
@@ -339,7 +334,7 @@ public sealed class ExpressionEvaluator
         {
             IndexValue value => EvaluateIndexValue(target, value, environment),
             SliceIndex slice => EvaluateSlice(target, slice, environment),
-            _ => throw new InvalidOperationException("Unsupported index specifier.")
+            _ => RuntimeErrors.Fail<StarlarkValue>("Unsupported index specifier.")
         };
     }
 
@@ -357,7 +352,7 @@ public sealed class ExpressionEvaluator
             StarlarkString text => IndexString(text, key),
             StarlarkBytes bytes => IndexBytes(bytes, key),
             StarlarkDict dict => IndexDict(dict, key),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Indexing not supported for type '{target.TypeName}'.")
         };
     }
@@ -377,7 +372,7 @@ public sealed class ExpressionEvaluator
             StarlarkTuple tuple => SliceTuple(tuple, start, stop, step),
             StarlarkString text => SliceString(text, start, stop, step),
             StarlarkBytes bytes => SliceBytes(bytes, start, stop, step),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Slicing not supported for type '{target.TypeName}'.")
         };
     }
@@ -395,8 +390,7 @@ public sealed class ExpressionEvaluator
             return intValue;
         }
 
-        throw new InvalidOperationException(
-            $"Slice indices must be int, got '{value.TypeName}'.");
+        return RuntimeErrors.Fail<StarlarkInt>($"Slice indices must be int, got '{value.TypeName}'.");
     }
 
     private static StarlarkValue SliceList(
@@ -512,7 +506,7 @@ public sealed class ExpressionEvaluator
         var stride = step?.Value ?? 1;
         if (stride == 0)
         {
-            throw new InvalidOperationException("Slice step cannot be zero.");
+            RuntimeErrors.Throw("Slice step cannot be zero.");
         }
 
         var stepValue = checked((int)stride);
@@ -610,7 +604,8 @@ public sealed class ExpressionEvaluator
             }
         }
 
-        throw new KeyNotFoundException("Key not found in dict.");
+        RuntimeErrors.Throw("Key not found in dict.");
+        return StarlarkNone.Instance;
     }
 
     private static int RequireIndex(StarlarkValue index)
@@ -620,8 +615,7 @@ public sealed class ExpressionEvaluator
             return checked((int)intValue.Value);
         }
 
-        throw new InvalidOperationException(
-            $"Index must be an int, got '{index.TypeName}'.");
+        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.");
     }
 
     private static int ResolveIndex(int position, int length)
@@ -629,7 +623,7 @@ public sealed class ExpressionEvaluator
         var resolved = position < 0 ? length + position : position;
         if (resolved < 0 || resolved >= length)
         {
-            throw new IndexOutOfRangeException("Index out of range.");
+            return RuntimeErrors.Fail<int>("Index out of range.");
         }
 
         return resolved;
@@ -651,7 +645,7 @@ public sealed class ExpressionEvaluator
                 ContainsBytes(bytes.Bytes, needle.Bytes),
             StarlarkRange range when item is StarlarkInt intValue =>
                 IsInRange(intValue.Value, range),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<bool>(
                 $"Membership not supported for '{container.TypeName}'.")
         };
     }
@@ -672,7 +666,7 @@ public sealed class ExpressionEvaluator
     {
         if (value is < 0 or > 255)
         {
-            throw new InvalidOperationException("bytes membership requires an int in the range 0-255.");
+            RuntimeErrors.Throw("bytes membership requires an int in the range 0-255.");
         }
 
         var needle = (byte)value;
@@ -819,7 +813,7 @@ public sealed class ExpressionEvaluator
             return CompareBytes(leftBytes.Bytes, rightBytes.Bytes);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<int>(
             $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -951,7 +945,7 @@ public sealed class ExpressionEvaluator
                 : new StarlarkFloat(leftNumber + rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '+' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -975,7 +969,7 @@ public sealed class ExpressionEvaluator
                 : new StarlarkFloat(leftNumber - rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '-' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1034,7 +1028,7 @@ public sealed class ExpressionEvaluator
                 : new StarlarkFloat(leftNumber * rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '*' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1047,7 +1041,7 @@ public sealed class ExpressionEvaluator
 
         if (count > int.MaxValue)
         {
-            throw new InvalidOperationException("Repeat count is too large.");
+            RuntimeErrors.Throw("Repeat count is too large.");
         }
 
         var builder = new System.Text.StringBuilder(value.Length * (int)count);
@@ -1068,7 +1062,7 @@ public sealed class ExpressionEvaluator
 
         if (count > int.MaxValue)
         {
-            throw new InvalidOperationException("Repeat count is too large.");
+            RuntimeErrors.Throw("Repeat count is too large.");
         }
 
         var total = value.Length * (int)count;
@@ -1090,7 +1084,7 @@ public sealed class ExpressionEvaluator
 
         if (count > int.MaxValue)
         {
-            throw new InvalidOperationException("Repeat count is too large.");
+            RuntimeErrors.Throw("Repeat count is too large.");
         }
 
         var total = checked(items.Count * (int)count);
@@ -1111,7 +1105,7 @@ public sealed class ExpressionEvaluator
             return new StarlarkFloat(leftNumber / rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '/' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1121,7 +1115,7 @@ public sealed class ExpressionEvaluator
         {
             if (rightInt.Value == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             var quotient = leftInt.Value / rightInt.Value;
@@ -1139,13 +1133,13 @@ public sealed class ExpressionEvaluator
         {
             if (rightNumber == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             return new StarlarkFloat(Math.Floor(leftNumber / rightNumber));
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '//' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1160,7 +1154,7 @@ public sealed class ExpressionEvaluator
         {
             if (rightInt.Value == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             var quotient = leftInt.Value / rightInt.Value;
@@ -1179,14 +1173,14 @@ public sealed class ExpressionEvaluator
         {
             if (rightNumber == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             var quotient = Math.Floor(leftNumber / rightNumber);
             return new StarlarkFloat(leftNumber - quotient * rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1207,7 +1201,7 @@ public sealed class ExpressionEvaluator
             return UnionSet(leftSet, rightSet);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1223,7 +1217,7 @@ public sealed class ExpressionEvaluator
             return SymmetricDifferenceSet(leftSet, rightSet);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1239,7 +1233,7 @@ public sealed class ExpressionEvaluator
             return IntersectionSet(leftSet, rightSet);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '&' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1249,13 +1243,13 @@ public sealed class ExpressionEvaluator
         {
             if (rightInt.Value < 0)
             {
-                throw new InvalidOperationException("shift count must be non-negative.");
+                RuntimeErrors.Throw("shift count must be non-negative.");
             }
 
             return new StarlarkInt(leftInt.Value << (int)Math.Min(rightInt.Value, int.MaxValue));
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '<<' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1265,13 +1259,13 @@ public sealed class ExpressionEvaluator
         {
             if (rightInt.Value < 0)
             {
-                throw new InvalidOperationException("shift count must be non-negative.");
+                RuntimeErrors.Throw("shift count must be non-negative.");
             }
 
             return new StarlarkInt(leftInt.Value >> (int)Math.Min(rightInt.Value, int.MaxValue));
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '>>' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -1397,7 +1391,7 @@ public sealed class ExpressionEvaluator
             case ComprehensionClauseKind.For:
                 if (clause.Target == null || clause.Iterable == null)
                 {
-                    throw new InvalidOperationException("Invalid comprehension for-clause.");
+                    RuntimeErrors.Throw("Invalid comprehension for-clause.");
                 }
 
                 var iterable = Evaluate(clause.Iterable, environment);
@@ -1410,7 +1404,7 @@ public sealed class ExpressionEvaluator
             case ComprehensionClauseKind.If:
                 if (clause.Condition == null)
                 {
-                    throw new InvalidOperationException("Invalid comprehension if-clause.");
+                    RuntimeErrors.Throw("Invalid comprehension if-clause.");
                 }
 
                 var condition = Evaluate(clause.Condition, environment);
@@ -1420,7 +1414,8 @@ public sealed class ExpressionEvaluator
                 }
                 break;
             default:
-                throw new InvalidOperationException("Unsupported comprehension clause.");
+                RuntimeErrors.Throw("Unsupported comprehension clause.");
+                break;
         }
     }
 
@@ -1443,7 +1438,7 @@ public sealed class ExpressionEvaluator
             case StarlarkRange range:
                 return EnumerateRange(range);
             default:
-                throw new InvalidOperationException(
+                return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
                     $"Type '{value.TypeName}' is not iterable.");
         }
     }
@@ -1465,8 +1460,8 @@ public sealed class ExpressionEvaluator
                 AssignSequenceTargets(listTarget.Items, value, environment);
                 break;
             default:
-                throw new InvalidOperationException(
-                    $"Unsupported assignment target '{target.GetType().Name}'.");
+                RuntimeErrors.Throw($"Unsupported assignment target '{target.GetType().Name}'.");
+                break;
         }
     }
 
@@ -1484,8 +1479,8 @@ public sealed class ExpressionEvaluator
                 AssignDictIndex(dict, index, value);
                 break;
             default:
-                throw new InvalidOperationException(
-                    $"Index assignment not supported for '{container.TypeName}'.");
+                RuntimeErrors.Throw($"Index assignment not supported for '{container.TypeName}'.");
+                break;
         }
     }
 
@@ -1497,7 +1492,7 @@ public sealed class ExpressionEvaluator
         var items = ExtractSequenceItems(value);
         if (items.Count != targets.Count)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Assignment length mismatch. Expected {targets.Count} values but got {items.Count}.");
         }
 
@@ -1513,17 +1508,17 @@ public sealed class ExpressionEvaluator
         {
             StarlarkList list => list.Items,
             StarlarkTuple tuple => tuple.Items,
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<IReadOnlyList<StarlarkValue>>(
                 $"Value of type '{value.TypeName}' is not iterable for assignment.")
         };
     }
 
     private static void AssignListIndex(StarlarkList list, StarlarkValue index, StarlarkValue value)
     {
-        if (index is not StarlarkInt intIndex)
+        var intIndex = index as StarlarkInt;
+        if (intIndex == null)
         {
-            throw new InvalidOperationException(
-                $"Index must be an int, got '{index.TypeName}'.");
+            RuntimeErrors.Throw($"Index must be an int, got '{index.TypeName}'.");
         }
 
         var position = checked((int)intIndex.Value);
@@ -1534,7 +1529,7 @@ public sealed class ExpressionEvaluator
 
         if (position < 0 || position >= list.Items.Count)
         {
-            throw new IndexOutOfRangeException("Index out of range.");
+            RuntimeErrors.Throw("Index out of range.");
         }
 
         list.Items[position] = value;
@@ -1576,7 +1571,7 @@ public sealed class ExpressionEvaluator
             case StarlarkBytesElems elems:
                 return elems.Enumerate();
             default:
-                throw new InvalidOperationException(
+                return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
                     $"Object of type '{value.TypeName}' is not iterable.");
         }
     }
@@ -1603,22 +1598,23 @@ public sealed class ExpressionEvaluator
         IDictionary<string, StarlarkValue> kwargs,
         StarlarkValue value)
     {
-        if (value is not StarlarkDict dict)
+        var dict = value as StarlarkDict;
+        if (dict == null)
         {
-            throw new InvalidOperationException("**kwargs requires a dict.");
+            RuntimeErrors.Throw("**kwargs requires a dict.");
         }
 
         foreach (var entry in dict.Entries)
         {
-            if (entry.Key is not StarlarkString key)
+            var key = entry.Key as StarlarkString;
+            if (key == null)
             {
-                throw new InvalidOperationException("**kwargs keys must be strings.");
+                RuntimeErrors.Throw("**kwargs keys must be strings.");
             }
 
             if (kwargs.ContainsKey(key.Value))
             {
-                throw new InvalidOperationException(
-                    $"Got multiple values for keyword argument '{key.Value}'.");
+                RuntimeErrors.Throw($"Got multiple values for keyword argument '{key.Value}'.");
             }
 
             kwargs[key.Value] = entry.Value;

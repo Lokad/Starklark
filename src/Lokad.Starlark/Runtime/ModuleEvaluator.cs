@@ -14,14 +14,19 @@ public sealed class ModuleEvaluator
         switch (result.Kind)
         {
             case FlowKind.Return:
-                throw new InvalidOperationException("Return statement is not allowed at module scope.");
+                RuntimeErrors.Throw("Return statement is not allowed at module scope.");
+                break;
             case FlowKind.Break:
-                throw new InvalidOperationException("Break statement is not allowed at module scope.");
+                RuntimeErrors.Throw("Break statement is not allowed at module scope.");
+                break;
             case FlowKind.Continue:
-                throw new InvalidOperationException("Continue statement is not allowed at module scope.");
+                RuntimeErrors.Throw("Continue statement is not allowed at module scope.");
+                break;
             default:
                 return result.LastValue;
         }
+
+        return null;
     }
 
     public StarlarkValue ExecuteFunctionBody(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
@@ -32,12 +37,16 @@ public sealed class ModuleEvaluator
             case FlowKind.Return:
                 return result.Value ?? StarlarkNone.Instance;
             case FlowKind.Break:
-                throw new InvalidOperationException("Break statement is only valid inside loops.");
+                RuntimeErrors.Throw("Break statement is only valid inside loops.");
+                break;
             case FlowKind.Continue:
-                throw new InvalidOperationException("Continue statement is only valid inside loops.");
+                RuntimeErrors.Throw("Continue statement is only valid inside loops.");
+                break;
             default:
                 return StarlarkNone.Instance;
         }
+
+        return StarlarkNone.Instance;
     }
 
     private FlowResult ExecuteStatements(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
@@ -113,8 +122,8 @@ public sealed class ModuleEvaluator
                     lastValue = null;
                     break;
                 default:
-                    throw new InvalidOperationException(
-                        $"Unsupported statement type '{statement.GetType().Name}'.");
+                    RuntimeErrors.Throw($"Unsupported statement type '{statement.GetType().Name}'.");
+                    break;
             }
         }
 
@@ -162,20 +171,19 @@ public sealed class ModuleEvaluator
     {
         if (environment.Parent != null)
         {
-            throw new InvalidOperationException("load statements may only appear at top level.");
+            RuntimeErrors.Throw("load statements may only appear at top level.");
         }
 
         if (!environment.Modules.TryGetValue(loadStatement.Module, out var module))
         {
-            throw new KeyNotFoundException($"Module '{loadStatement.Module}' not found.");
+            RuntimeErrors.Throw($"Module '{loadStatement.Module}' not found.");
         }
 
         foreach (var binding in loadStatement.Bindings)
         {
             if (!module.TryGetValue(binding.Name, out var value))
             {
-                throw new KeyNotFoundException(
-                    $"Symbol '{binding.Name}' not found in module '{loadStatement.Module}'.");
+                RuntimeErrors.Throw($"Symbol '{binding.Name}' not found in module '{loadStatement.Module}'.");
             }
 
             environment.Set(binding.Alias, value);
@@ -199,8 +207,8 @@ public sealed class ModuleEvaluator
                 AssignSequenceTargets(listTarget.Items, value, environment);
                 break;
             default:
-                throw new InvalidOperationException(
-                    $"Unsupported assignment target '{target.GetType().Name}'.");
+                RuntimeErrors.Throw($"Unsupported assignment target '{target.GetType().Name}'.");
+                break;
         }
     }
 
@@ -215,8 +223,9 @@ public sealed class ModuleEvaluator
                 ExecuteAugmentedIndexAssignment(indexTarget, assignment, environment);
                 break;
             default:
-                throw new InvalidOperationException(
+                RuntimeErrors.Throw(
                     $"Augmented assignment not supported for '{assignment.Target.GetType().Name}'.");
+                break;
         }
     }
 
@@ -227,7 +236,7 @@ public sealed class ModuleEvaluator
     {
         if (!environment.TryGet(target.Name, out var existing))
         {
-            throw new KeyNotFoundException($"Undefined identifier '{target.Name}'.");
+            RuntimeErrors.Throw($"Undefined identifier '{target.Name}'.");
         }
 
         var right = _expressionEvaluator.Evaluate(assignment.Value, environment);
@@ -292,8 +301,8 @@ public sealed class ModuleEvaluator
                 AssignDictIndex(dict, index, result);
                 break;
             default:
-                throw new InvalidOperationException(
-                    $"Index assignment not supported for '{container.TypeName}'.");
+                RuntimeErrors.Throw($"Index assignment not supported for '{container.TypeName}'.");
+                break;
         }
     }
 
@@ -316,8 +325,9 @@ public sealed class ModuleEvaluator
                 }
                 break;
             default:
-                throw new InvalidOperationException(
+                RuntimeErrors.Throw(
                     $"Operator '+=' not supported for '{list.TypeName}' and '{value.TypeName}'.");
+                break;
         }
     }
 
@@ -329,7 +339,7 @@ public sealed class ModuleEvaluator
             StarlarkTuple tuple => IndexTuple(tuple, index),
             StarlarkString text => IndexString(text, index),
             StarlarkDict dict => IndexDict(dict, index),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Indexing not supported for '{container.TypeName}'.")
         };
     }
@@ -366,7 +376,8 @@ public sealed class ModuleEvaluator
             }
         }
 
-        throw new KeyNotFoundException("Key not found in dict.");
+        RuntimeErrors.Throw("Key not found in dict.");
+        return StarlarkNone.Instance;
     }
 
     private static int RequireIndex(StarlarkValue index)
@@ -376,8 +387,7 @@ public sealed class ModuleEvaluator
             return checked((int)intValue.Value);
         }
 
-        throw new InvalidOperationException(
-            $"Index must be an int, got '{index.TypeName}'.");
+        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.");
     }
 
     private static int ResolveIndex(int position, int length)
@@ -385,7 +395,7 @@ public sealed class ModuleEvaluator
         var resolved = position < 0 ? length + position : position;
         if (resolved < 0 || resolved >= length)
         {
-            throw new IndexOutOfRangeException("Index out of range.");
+            return RuntimeErrors.Fail<int>("Index out of range.");
         }
 
         return resolved;
@@ -409,7 +419,7 @@ public sealed class ModuleEvaluator
             BinaryOperator.BitwiseAnd => BitwiseAnd(left, right),
             BinaryOperator.ShiftLeft => ShiftLeft(left, right),
             BinaryOperator.ShiftRight => ShiftRight(left, right),
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Operator '{op}' not supported for augmented assignment.")
         };
     }
@@ -447,7 +457,7 @@ public sealed class ModuleEvaluator
                 : new StarlarkFloat(leftNumber + rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '+' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -471,7 +481,7 @@ public sealed class ModuleEvaluator
                 : new StarlarkFloat(leftNumber - rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '-' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -520,7 +530,7 @@ public sealed class ModuleEvaluator
                 : new StarlarkFloat(leftNumber * rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '*' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -532,7 +542,7 @@ public sealed class ModuleEvaluator
             return new StarlarkFloat(leftNumber / rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '/' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -542,7 +552,7 @@ public sealed class ModuleEvaluator
         {
             if (rightInt.Value == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             var quotient = leftInt.Value / rightInt.Value;
@@ -560,13 +570,13 @@ public sealed class ModuleEvaluator
         {
             if (rightNumber == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             return new StarlarkFloat(Math.Floor(leftNumber / rightNumber));
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '//' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -581,7 +591,7 @@ public sealed class ModuleEvaluator
         {
             if (rightInt.Value == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             var quotient = leftInt.Value / rightInt.Value;
@@ -600,14 +610,14 @@ public sealed class ModuleEvaluator
         {
             if (rightNumber == 0)
             {
-                throw new DivideByZeroException("Division by zero.");
+                RuntimeErrors.Throw("Division by zero.");
             }
 
             var quotient = Math.Floor(leftNumber / rightNumber);
             return new StarlarkFloat(leftNumber - quotient * rightNumber);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -628,7 +638,7 @@ public sealed class ModuleEvaluator
             return UnionSet(leftSet, rightSet);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -644,7 +654,7 @@ public sealed class ModuleEvaluator
             return SymmetricDifferenceSet(leftSet, rightSet);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -660,7 +670,7 @@ public sealed class ModuleEvaluator
             return IntersectionSet(leftSet, rightSet);
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '&' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -670,13 +680,13 @@ public sealed class ModuleEvaluator
         {
             if (rightInt.Value < 0)
             {
-                throw new InvalidOperationException("shift count must be non-negative.");
+                RuntimeErrors.Throw("shift count must be non-negative.");
             }
 
             return new StarlarkInt(leftInt.Value << (int)Math.Min(rightInt.Value, int.MaxValue));
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '<<' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -686,13 +696,13 @@ public sealed class ModuleEvaluator
         {
             if (rightInt.Value < 0)
             {
-                throw new InvalidOperationException("shift count must be non-negative.");
+                RuntimeErrors.Throw("shift count must be non-negative.");
             }
 
             return new StarlarkInt(leftInt.Value >> (int)Math.Min(rightInt.Value, int.MaxValue));
         }
 
-        throw new InvalidOperationException(
+        return RuntimeErrors.Fail<StarlarkValue>(
             $"Operator '>>' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
@@ -801,7 +811,7 @@ public sealed class ModuleEvaluator
 
         if (count > int.MaxValue)
         {
-            throw new InvalidOperationException("Repeat count is too large.");
+            RuntimeErrors.Throw("Repeat count is too large.");
         }
 
         var builder = new System.Text.StringBuilder(value.Length * (int)count);
@@ -822,7 +832,7 @@ public sealed class ModuleEvaluator
 
         if (count > int.MaxValue)
         {
-            throw new InvalidOperationException("Repeat count is too large.");
+            RuntimeErrors.Throw("Repeat count is too large.");
         }
 
         var total = checked(items.Count * (int)count);
@@ -850,8 +860,8 @@ public sealed class ModuleEvaluator
                 AssignDictIndex(dict, index, value);
                 break;
             default:
-                throw new InvalidOperationException(
-                    $"Index assignment not supported for '{container.TypeName}'.");
+                RuntimeErrors.Throw($"Index assignment not supported for '{container.TypeName}'.");
+                break;
         }
     }
 
@@ -863,7 +873,7 @@ public sealed class ModuleEvaluator
         var items = ExtractSequenceItems(value);
         if (items.Count != targets.Count)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Assignment length mismatch. Expected {targets.Count} values but got {items.Count}.");
         }
 
@@ -879,17 +889,17 @@ public sealed class ModuleEvaluator
         {
             StarlarkList list => list.Items,
             StarlarkTuple tuple => tuple.Items,
-            _ => throw new InvalidOperationException(
+            _ => RuntimeErrors.Fail<IReadOnlyList<StarlarkValue>>(
                 $"Value of type '{value.TypeName}' is not iterable for assignment.")
         };
     }
 
     private static void AssignListIndex(StarlarkList list, StarlarkValue index, StarlarkValue value)
     {
-        if (index is not StarlarkInt intIndex)
+        var intIndex = index as StarlarkInt;
+        if (intIndex == null)
         {
-            throw new InvalidOperationException(
-                $"Index must be an int, got '{index.TypeName}'.");
+            RuntimeErrors.Throw($"Index must be an int, got '{index.TypeName}'.");
         }
 
         var position = checked((int)intIndex.Value);
@@ -900,7 +910,7 @@ public sealed class ModuleEvaluator
 
         if (position < 0 || position >= list.Items.Count)
         {
-            throw new IndexOutOfRangeException("Index out of range.");
+            RuntimeErrors.Throw("Index out of range.");
         }
 
         list.Items[position] = value;
@@ -927,9 +937,10 @@ public sealed class ModuleEvaluator
 
     private static void UnionDictInPlace(StarlarkDict dict, StarlarkValue right)
     {
-        if (right is not StarlarkDict other)
+        var other = right as StarlarkDict;
+        if (other == null)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Operator '|=' not supported for '{dict.TypeName}' and '{right.TypeName}'.");
         }
 
@@ -948,9 +959,10 @@ public sealed class ModuleEvaluator
 
     private static void UnionSetInPlace(StarlarkSet set, StarlarkValue right)
     {
-        if (right is not StarlarkSet other)
+        var other = right as StarlarkSet;
+        if (other == null)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Operator '|=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
         }
 
@@ -962,9 +974,10 @@ public sealed class ModuleEvaluator
 
     private static void IntersectionSetInPlace(StarlarkSet set, StarlarkValue right)
     {
-        if (right is not StarlarkSet other)
+        var other = right as StarlarkSet;
+        if (other == null)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Operator '&=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
         }
 
@@ -986,9 +999,10 @@ public sealed class ModuleEvaluator
 
     private static void DifferenceSetInPlace(StarlarkSet set, StarlarkValue right)
     {
-        if (right is not StarlarkSet other)
+        var other = right as StarlarkSet;
+        if (other == null)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Operator '-=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
         }
 
@@ -1010,9 +1024,10 @@ public sealed class ModuleEvaluator
 
     private static void SymmetricDifferenceSetInPlace(StarlarkSet set, StarlarkValue right)
     {
-        if (right is not StarlarkSet other)
+        var other = right as StarlarkSet;
+        if (other == null)
         {
-            throw new InvalidOperationException(
+            RuntimeErrors.Throw(
                 $"Operator '^=' not supported for '{set.TypeName}' and '{right.TypeName}'.");
         }
 
@@ -1126,8 +1141,8 @@ public sealed class ModuleEvaluator
                 }
                 yield break;
             default:
-                throw new InvalidOperationException(
-                    $"Type '{iterable.TypeName}' is not iterable.");
+                RuntimeErrors.Throw($"Type '{iterable.TypeName}' is not iterable.");
+                yield break;
         }
     }
     private enum FlowKind
