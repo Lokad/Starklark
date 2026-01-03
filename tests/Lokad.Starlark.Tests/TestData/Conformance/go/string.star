@@ -64,3 +64,5 @@ assert_eq("A %(foo)d %(bar)s Z" % {"foo": 123, "bar": "hi"}, "A 123 hi Z")
 "%d %d" % 1 ### (Not enough arguments|not iterable)
 ---
 "%d %d" % (1, 2, 3) ### (Too many arguments|not all arguments)
+---
+list("abc") ### (not iterable)

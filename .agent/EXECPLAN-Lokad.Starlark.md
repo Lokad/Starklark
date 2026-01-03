@@ -58,8 +58,8 @@ Core Semantics:
 - Enforce function-local binding rules and reference-before-assignment errors. (done)
 
 Builtins & Methods:
-- Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
-- Complete string/list/dict methods per spec, including argument validation and error messages.
+- Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`). (done)
+- Complete string/list/dict methods per spec, including argument validation and error messages. (done)
 - Implement set type and set builtins/methods/operators. (done)
 - Verify `%` formatting and `str.format` behaviors with spec-aligned edge cases. (done)
 - Add `bytes` builtin, `bytes.elems`, and missing string methods (`capitalize`, `elems`, `islower`, `istitle`, `isupper`, `isspace`). (done)
@@ -282,3 +282,4 @@ Plan revisions:
 - Updated conformance coverage for `%` formatting and `str.format` edge cases.
 - Added function-local binding diagnostics for reference-before-assignment cases.
 - Added conformance coverage for list comprehension scoping.
+- Added error coverage for string non-iterability in list().
