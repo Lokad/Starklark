@@ -155,6 +155,11 @@ public sealed class ModuleEvaluator
 
     private static void ExecuteLoadStatement(LoadStatement loadStatement, StarlarkEnvironment environment)
     {
+        if (environment.Parent != null)
+        {
+            throw new InvalidOperationException("load statements may only appear at top level.");
+        }
+
         if (!environment.Modules.TryGetValue(loadStatement.Module, out var module))
         {
             throw new KeyNotFoundException($"Module '{loadStatement.Module}' not found.");

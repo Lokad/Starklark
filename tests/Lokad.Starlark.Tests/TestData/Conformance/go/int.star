@@ -29,6 +29,12 @@ assert_(2.0 >= 2)
 assert_eq(int("123"), 123)
 assert_eq(int("-123"), -123)
 ---
+assert_eq(0x10 + 1, 17)
+assert_eq(0o10, 8)
+assert_eq(0b1010, 10)
+assert_eq(1e2, 100.0)
+assert_eq(1.5e1, 15.0)
+---
 assert_eq(+5, 5)
 assert_eq(~1, -2)
 assert_eq(5 & 3, 1)

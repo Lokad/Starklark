@@ -30,7 +30,16 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             return new LiteralExpression(double.Parse(value, CultureInfo.InvariantCulture));
         }
 
-        return new LiteralExpression(long.Parse(value, CultureInfo.InvariantCulture));
+        var (baseValue, sliceStart) = value switch
+        {
+            [ '0', 'x' or 'X', .. ] => (16, 2),
+            [ '0', 'o' or 'O', .. ] => (8, 2),
+            [ '0', 'b' or 'B', .. ] => (2, 2),
+            _ => (10, 0)
+        };
+
+        var literal = sliceStart == 0 ? value : value[sliceStart..];
+        return new LiteralExpression(Convert.ToInt64(literal, baseValue));
     }
 
     [Rule]

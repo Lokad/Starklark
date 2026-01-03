@@ -134,7 +134,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         [T(Token.OpenParen)] Token openParen,
         [T(Token.String)] string module,
         [T(Token.Comma)] Token comma,
-        [L(Sep = Token.Comma)] LoadBinding[] bindings,
+        [L(Sep = Token.Comma, Min = 1)] LoadBinding[] bindings,
         [T(Token.CloseParen)] Token closeParen)
     {
         return new SimpleStatement(

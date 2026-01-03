@@ -25,3 +25,7 @@ cyclic_dict = {}
 cyclic_dict["self"] = cyclic_dict
 repr(cyclic_dict) ### (maximum recursion)
 cyclic_dict == cyclic_dict ### (maximum recursion)
+---
+def bad_load():
+    load("not_a_module", "x")
+bad_load() ### (load statements may only appear at top level)
