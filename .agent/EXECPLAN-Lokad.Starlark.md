@@ -20,6 +20,39 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [ ] Add README/docs for extension model and test harness usage.
 - [ ] Final stabilization: run full test suite, review diffs, and prepare for packaging (NuGet metadata deferred).
 
+## Spec Compliance Checklist
+
+This checklist is the source of truth for the remaining work needed to reach full Starlark spec compliance.
+
+Parsing & Syntax:
+- Support single-quoted strings and raw string literals (`r"..."` / `r'...'`).
+- Parse empty tuple literal `()` and disambiguate parenthesized expressions.
+- Allow conditional expressions in all expression positions (including call arguments).
+- Ensure `load` statements and string literal forms match the spec grammar.
+
+Core Semantics:
+- Implement boolean ordering comparisons (`False < True`, etc.) per spec ordering rules.
+- Enforce mutation-during-iteration restrictions for list/dict (and comprehensions) where required.
+- Implement recursion detection (dynamic call stack) consistent with Starlark rules.
+- Align hashing, equality, and type ordering to spec (including cross-type comparison restrictions).
+
+Builtins & Methods:
+- Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
+- Complete string/list/dict methods per spec, including argument validation and error messages.
+- Verify `%` formatting and `str.format` behaviors with spec-aligned edge cases.
+
+Diagnostics & Error Behavior:
+- Normalize error types/messages to spec expectations where tests rely on them.
+- Add conformance coverage for error paths, not just success cases.
+
+## Compliance Plan
+
+1. Close parsing gaps (single-quoted/raw strings, empty tuple, conditional expression precedence).
+2. Implement runtime semantics: mutation-during-iteration, recursion detection, bool ordering.
+3. Finish builtins/methods per spec and add targeted tests for each.
+4. Expand conformance suite with spec-driven edge cases and ensure deterministic errors.
+5. Stabilize and run the full suite across net8/net10.
+
 ## Surprises & Discoveries
 
 - Observation: `dotnet test` reports `MSB1009` when passed a `.slnx` file; CLI may not recognize the new solution format.
@@ -203,3 +236,4 @@ Plan revisions:
 - Added misc conformance subset from go suite.
 - Added java/rust conformance subsets for string and regression coverage.
 - Added java/rust conformance subsets for string formatting behavior.
+- Added spec compliance checklist and compliance plan.
