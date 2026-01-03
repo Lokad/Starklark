@@ -134,7 +134,7 @@ public sealed class ModuleEvaluator
 
         foreach (var item in Enumerate(iterable))
         {
-            environment.Set(forStatement.Name, item);
+            AssignTarget(forStatement.Target, item, environment);
             try
             {
                 ExecuteStatements(forStatement.Body, environment);

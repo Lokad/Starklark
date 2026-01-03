@@ -179,13 +179,13 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     [Rule]
     public CompoundStatement ForStatement(
         [T(Token.For)] Token keyword,
-        [T(Token.Id)] string name,
+        [NT] AssignmentTarget target,
         [T(Token.In)] Token inKeyword,
         [NT] Expression iterable,
         [T(Token.Colon)] Token colon,
         [NT] Suite suite)
     {
-        return new CompoundStatement(new ForStatement(name, iterable, suite.Statements));
+        return new CompoundStatement(new ForStatement(target, iterable, suite.Statements));
     }
 
     [Rule]

@@ -45,6 +45,22 @@ public sealed class ModuleEvaluatorTests
     }
 
     [Fact]
+    public void ExecutesTupleForTarget()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "total = 0\n" +
+            "for x, y in [(1, 2), (3, 4)]:\n" +
+            "  total = total + x + y\n" +
+            "total\n",
+            environment);
+
+        Assert.Equal(new StarlarkInt(10), result);
+    }
+
+    [Fact]
     public void ExecutesFunctionDefinition()
     {
         var interpreter = new StarlarkInterpreter();

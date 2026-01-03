@@ -108,7 +108,19 @@ public sealed class ModuleParsingTests
 
         var statement = Assert.Single(module.Statements);
         var forStatement = Assert.IsType<ForStatement>(statement);
-        Assert.Equal("x", forStatement.Name);
+        var target = Assert.IsType<NameTarget>(forStatement.Target);
+        Assert.Equal("x", target.Name);
+    }
+
+    [Fact]
+    public void ParsesTupleForTarget()
+    {
+        var module = StarlarkModuleParser.ParseModule("for x, y in [(1, 2)]:\n  x\n");
+
+        var statement = Assert.Single(module.Statements);
+        var forStatement = Assert.IsType<ForStatement>(statement);
+        var target = Assert.IsType<TupleTarget>(forStatement.Target);
+        Assert.Equal(2, target.Items.Count);
     }
 
     [Fact]

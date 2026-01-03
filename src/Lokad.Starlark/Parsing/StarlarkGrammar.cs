@@ -310,6 +310,13 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     }
 
     [Rule]
+    public AssignmentTarget TargetTupleLoose(
+        [L(Sep = Token.Comma, Min = 2)] AssignmentTarget[] items)
+    {
+        return new TupleTarget(items);
+    }
+
+    [Rule]
     public Expression Index(
         [NT(0)] Expression target,
         [T(Token.OpenBracket)] Token open,

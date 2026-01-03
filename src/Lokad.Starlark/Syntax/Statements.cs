@@ -30,7 +30,7 @@ public sealed record IfStatement(
     IReadOnlyList<Statement> ElseStatements) : Statement;
 
 public sealed record ForStatement(
-    string Name,
+    AssignmentTarget Target,
     Expression Iterable,
     IReadOnlyList<Statement> Body) : Statement;
 
