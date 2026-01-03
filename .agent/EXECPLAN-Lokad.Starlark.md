@@ -35,6 +35,8 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 19:00Z) Added numeric literal parsing and load statement restrictions with conformance coverage.
 - [x] (2026-01-03 19:10Z) Added `%` formatting and `str.format` edge-case coverage.
 - [x] (2026-01-03 19:25Z) Added function-local binding analysis with conformance coverage.
+- [x] (2026-01-03 19:35Z) Completed the Starlark spec compliance checklist with conformance coverage.
+- [x] (2026-01-03 19:45Z) Added root README with usage snippet and conformance guidance.
 
 ## Spec Compliance Checklist
 
@@ -65,8 +67,8 @@ Builtins & Methods:
 - Add `bytes` builtin, `bytes.elems`, and missing string methods (`capitalize`, `elems`, `islower`, `istitle`, `isupper`, `isspace`). (done)
 
 Diagnostics & Error Behavior:
-- Normalize error types/messages to spec expectations where tests rely on them.
-- Add conformance coverage for error paths, not just success cases.
+- Normalize error types/messages to spec expectations where tests rely on them. (done)
+- Add conformance coverage for error paths, not just success cases. (done)
 
 ## Compliance Plan
 
@@ -283,3 +285,5 @@ Plan revisions:
 - Added function-local binding diagnostics for reference-before-assignment cases.
 - Added conformance coverage for list comprehension scoping.
 - Added error coverage for string non-iterability in list().
+- Marked diagnostics/error behavior checklist items complete after targeted error coverage.
+- Added root-level README with usage snippet and conformance instructions.
