@@ -40,8 +40,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
 
         return args[0] switch
         {
@@ -60,11 +60,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        if (args.Count is < 1 or > 3)
-        {
-            throw new InvalidOperationException("range expects 1 to 3 arguments.");
-        }
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectRange(args, 1, 3, "range");
 
         var start = 0L;
         var stop = 0L;
@@ -98,13 +95,13 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkList(Array.Empty<StarlarkValue>());
         }
 
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectExact(args, 1);
         var items = Enumerate(args[0]);
         return new StarlarkList(items);
     }
@@ -113,13 +110,13 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkTuple(Array.Empty<StarlarkValue>());
         }
 
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectExact(args, 1);
         var items = new List<StarlarkValue>(Enumerate(args[0]));
         return new StarlarkTuple(items);
     }
@@ -128,13 +125,13 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkBool(false);
         }
 
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectExact(args, 1);
         return new StarlarkBool(args[0].IsTruthy);
     }
 
@@ -142,8 +139,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         foreach (var item in Enumerate(args[0]))
         {
             if (item.IsTruthy)
@@ -159,8 +156,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         foreach (var item in Enumerate(args[0]))
         {
             if (!item.IsTruthy)
@@ -219,13 +216,13 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkSet(Array.Empty<StarlarkValue>());
         }
 
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectExact(args, 1);
         var items = new List<StarlarkValue>();
         foreach (var item in Enumerate(args[0]))
         {
@@ -243,8 +240,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         return new StarlarkString(StarlarkFormatting.ToString(args[0]));
     }
 
@@ -334,13 +331,13 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkFloat(0.0);
         }
 
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectExact(args, 1);
         var value = args[0];
         return value switch
         {
@@ -360,8 +357,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         var value = args[0];
         switch (value)
         {
@@ -405,8 +402,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         return new StarlarkString(args[0].TypeName);
     }
 
@@ -414,8 +411,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         return new StarlarkString(StarlarkFormatting.ToRepr(args[0]));
     }
 
@@ -467,8 +464,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         return args[0] switch
         {
             StarlarkList list => new StarlarkList(list.Items.AsEnumerable().Reverse().ToList()),
@@ -531,7 +528,7 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count == 0)
         {
             return new StarlarkList(Array.Empty<StarlarkValue>());
@@ -559,8 +556,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
 
         var names = GetDirMembers(args[0]);
         names.Sort(StringComparer.Ordinal);
@@ -571,7 +568,7 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
         if (args.Count is < 2 or > 3)
         {
             throw new InvalidOperationException("getattr expects 2 or 3 arguments.");
@@ -601,8 +598,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 2);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 2);
         if (args[1] is not StarlarkString name)
         {
             throw new InvalidOperationException("hasattr expects a string attribute name.");
@@ -623,8 +620,8 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
-        ExpectArgCount(args, 1);
+        ArgumentBinder.ExpectNoKeywords(kwargs);
+        ArgumentBinder.ExpectExact(args, 1);
         var value = args[0];
         return value switch
         {
@@ -1032,22 +1029,6 @@ public static class StarlarkBuiltins
         }
     }
 
-    private static void ExpectArgCount(IReadOnlyList<StarlarkValue> args, int count)
-    {
-        if (args.Count != count)
-        {
-            throw new InvalidOperationException($"Expected {count} arguments, got {args.Count}.");
-        }
-    }
-
-    private static void ExpectNoKeywords(IReadOnlyDictionary<string, StarlarkValue> kwargs)
-    {
-        if (kwargs.Count > 0)
-        {
-            throw new InvalidOperationException("Unexpected keyword arguments.");
-        }
-    }
-
     private static bool TryGetPair(StarlarkValue item, out StarlarkValue key, out StarlarkValue value)
     {
         if (item is StarlarkTuple tuple && tuple.Items.Count == 2)
@@ -1181,3 +1162,4 @@ public static class StarlarkBuiltins
         };
     }
 }
+
