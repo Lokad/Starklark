@@ -157,7 +157,16 @@ public sealed class ExpressionEvaluator
         var (names, defaults, varArgsName, kwArgsName) =
             FunctionParameterEvaluator.Evaluate(lambda.Parameters, environment);
         var body = new Statement[] { new ReturnStatement(lambda.Body) };
-        return new StarlarkUserFunction("lambda", names, defaults, varArgsName, kwArgsName, body, environment);
+        var locals = FunctionLocalAnalyzer.CollectLocals(lambda.Parameters, body);
+        return new StarlarkUserFunction(
+            "lambda",
+            names,
+            defaults,
+            varArgsName,
+            kwArgsName,
+            body,
+            environment,
+            locals);
     }
 
     private StarlarkValue EvaluateCall(CallExpression call, StarlarkEnvironment environment)

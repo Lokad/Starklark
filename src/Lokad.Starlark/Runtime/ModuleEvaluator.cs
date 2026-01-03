@@ -78,6 +78,9 @@ public sealed class ModuleEvaluator
                 case FunctionDefinitionStatement functionDefinition:
                     var (names, defaults, varArgsName, kwArgsName) =
                         FunctionParameterEvaluator.Evaluate(functionDefinition.Parameters, environment);
+                    var locals = FunctionLocalAnalyzer.CollectLocals(
+                        functionDefinition.Parameters,
+                        functionDefinition.Body);
                     var function = new StarlarkUserFunction(
                         functionDefinition.Name,
                         names,
@@ -85,7 +88,8 @@ public sealed class ModuleEvaluator
                         varArgsName,
                         kwArgsName,
                         functionDefinition.Body,
-                        environment);
+                        environment,
+                        locals);
                     environment.Set(functionDefinition.Name, function);
                     lastValue = null;
                     break;

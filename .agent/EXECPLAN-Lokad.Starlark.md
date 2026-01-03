@@ -34,6 +34,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 18:35Z) Added lambda expressions and conformance coverage.
 - [x] (2026-01-03 19:00Z) Added numeric literal parsing and load statement restrictions with conformance coverage.
 - [x] (2026-01-03 19:10Z) Added `%` formatting and `str.format` edge-case coverage.
+- [x] (2026-01-03 19:25Z) Added function-local binding analysis with conformance coverage.
 
 ## Spec Compliance Checklist
 
@@ -54,6 +55,7 @@ Core Semantics:
 - Implement recursion detection (dynamic call stack) consistent with Starlark rules. (done)
 - Align hashing, equality, and type ordering to spec (including cross-type comparison restrictions). (done)
 - Implement bytes type semantics (indexing, slicing, equality, hashability, formatting). (done)
+- Enforce function-local binding rules and reference-before-assignment errors. (done)
 
 Builtins & Methods:
 - Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
@@ -278,3 +280,4 @@ Plan revisions:
 - Updated compliance checklist/progress after adding lambda expressions.
 - Updated compliance checklist/progress after adding numeric literal parsing and load restrictions.
 - Updated conformance coverage for `%` formatting and `str.format` edge cases.
+- Added function-local binding diagnostics for reference-before-assignment cases.

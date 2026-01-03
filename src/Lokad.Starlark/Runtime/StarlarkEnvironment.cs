@@ -7,6 +7,7 @@ namespace Lokad.Starlark.Runtime;
 public sealed class StarlarkEnvironment
 {
     private readonly Dictionary<string, StarlarkValue> _locals;
+    private readonly IReadOnlySet<string>? _declaredLocals;
     private readonly Stack<IReadOnlyList<Statement>> _callStack;
 
     public StarlarkEnvironment? Parent { get; }
@@ -19,11 +20,11 @@ public sealed class StarlarkEnvironment
         Parent == null ? _modules : Parent.Modules;
 
     public StarlarkEnvironment()
-        : this(null)
+        : this(null, null)
     {
     }
 
-    private StarlarkEnvironment(StarlarkEnvironment? parent)
+    private StarlarkEnvironment(StarlarkEnvironment? parent, IReadOnlySet<string>? declaredLocals)
     {
         Parent = parent;
         _locals = new Dictionary<string, StarlarkValue>(StringComparer.Ordinal);
@@ -33,6 +34,7 @@ public sealed class StarlarkEnvironment
         _callStack = parent == null
             ? new Stack<IReadOnlyList<Statement>>()
             : parent._callStack;
+        _declaredLocals = declaredLocals;
 
         if (parent == null)
         {
@@ -40,9 +42,9 @@ public sealed class StarlarkEnvironment
         }
     }
 
-    public StarlarkEnvironment CreateChild()
+    public StarlarkEnvironment CreateChild(IReadOnlySet<string>? declaredLocals = null)
     {
-        return new StarlarkEnvironment(this);
+        return new StarlarkEnvironment(this, declaredLocals);
     }
 
     public void Set(string name, StarlarkValue value)
@@ -90,6 +92,12 @@ public sealed class StarlarkEnvironment
             {
                 value = found ?? StarlarkNone.Instance;
                 return true;
+            }
+
+            if (scope._declaredLocals != null && scope._declaredLocals.Contains(name))
+            {
+                throw new InvalidOperationException(
+                    $"local variable '{name}' referenced before assignment.");
             }
         }
 

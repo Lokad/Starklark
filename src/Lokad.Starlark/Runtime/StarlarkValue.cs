@@ -452,7 +452,8 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         string? varArgsName,
         string? kwArgsName,
         IReadOnlyList<Lokad.Starlark.Syntax.Statement> body,
-        StarlarkEnvironment closure)
+        StarlarkEnvironment closure,
+        IReadOnlySet<string> locals)
     {
         Name = name;
         Parameters = parameters;
@@ -461,6 +462,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         KwArgsName = kwArgsName;
         Body = body;
         Closure = closure;
+        Locals = locals;
     }
 
     public string Name { get; }
@@ -470,6 +472,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
     public string? KwArgsName { get; }
     public IReadOnlyList<Lokad.Starlark.Syntax.Statement> Body { get; }
     public StarlarkEnvironment Closure { get; }
+    public IReadOnlySet<string> Locals { get; }
 
     public override StarlarkValue Call(
         IReadOnlyList<StarlarkValue> args,
@@ -560,7 +563,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
             }
         }
 
-        var callEnvironment = Closure.CreateChild();
+        var callEnvironment = Closure.CreateChild(Locals);
         for (var i = 0; i < Parameters.Count; i++)
         {
             callEnvironment.Set(Parameters[i], values[i]!);

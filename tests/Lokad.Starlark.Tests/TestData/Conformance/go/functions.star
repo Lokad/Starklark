@@ -20,3 +20,20 @@ def fib(x):
     return x
   return fib(x - 2) + fib(x - 1)
 fib(10) ### (called recursively)
+---
+x = 1
+def g():
+  return x + 1
+assert_eq(g(), 2)
+---
+x = 1
+def f():
+  x + 1
+  x = 3
+f() ### (referenced before assignment)
+---
+def h():
+  if False:
+    y = 1
+  return y
+h() ### (referenced before assignment)
