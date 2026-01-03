@@ -70,12 +70,19 @@ public enum CallArgumentKind
 
 public enum UnaryOperator
 {
+    Positive,
     Negate,
+    BitwiseNot,
     Not
 }
 
 public enum BinaryOperator
 {
+    BitwiseOr,
+    BitwiseXor,
+    BitwiseAnd,
+    ShiftLeft,
+    ShiftRight,
     Add,
     Subtract,
     Multiply,
@@ -96,27 +103,32 @@ public enum BinaryOperator
 
 public static class BinaryOperatorExtensions
 {
-    public const int MaxPriority = 3;
+    public const int MaxPriority = 8;
 
     public static int Priority(this BinaryOperator op)
     {
         return op switch
         {
-            BinaryOperator.Multiply => 3,
-            BinaryOperator.Divide => 3,
-            BinaryOperator.FloorDivide => 3,
-            BinaryOperator.Modulo => 3,
-            BinaryOperator.Add => 2,
-            BinaryOperator.Subtract => 2,
-            BinaryOperator.Equal => 1,
-            BinaryOperator.NotEqual => 1,
-            BinaryOperator.In => 1,
-            BinaryOperator.NotIn => 1,
-            BinaryOperator.Less => 1,
-            BinaryOperator.LessEqual => 1,
-            BinaryOperator.Greater => 1,
-            BinaryOperator.GreaterEqual => 1,
-            BinaryOperator.And => 0,
+            BinaryOperator.Multiply => 8,
+            BinaryOperator.Divide => 8,
+            BinaryOperator.FloorDivide => 8,
+            BinaryOperator.Modulo => 8,
+            BinaryOperator.Add => 7,
+            BinaryOperator.Subtract => 7,
+            BinaryOperator.ShiftLeft => 6,
+            BinaryOperator.ShiftRight => 6,
+            BinaryOperator.BitwiseAnd => 5,
+            BinaryOperator.BitwiseXor => 4,
+            BinaryOperator.BitwiseOr => 3,
+            BinaryOperator.Equal => 2,
+            BinaryOperator.NotEqual => 2,
+            BinaryOperator.In => 2,
+            BinaryOperator.NotIn => 2,
+            BinaryOperator.Less => 2,
+            BinaryOperator.LessEqual => 2,
+            BinaryOperator.Greater => 2,
+            BinaryOperator.GreaterEqual => 2,
+            BinaryOperator.And => 1,
             BinaryOperator.Or => 0,
             _ => 0
         };

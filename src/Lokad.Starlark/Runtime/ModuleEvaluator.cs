@@ -270,6 +270,13 @@ public sealed class ModuleEvaluator
             return;
         }
 
+        if (existing is StarlarkDict dict && assignment.Operator == BinaryOperator.BitwiseOr)
+        {
+            UnionDictInPlace(dict, right);
+            environment.Set(target.Name, dict);
+            return;
+        }
+
         var result = ApplyBinaryOperator(assignment.Operator, existing, right);
         environment.Set(target.Name, result);
     }
@@ -406,6 +413,11 @@ public sealed class ModuleEvaluator
             BinaryOperator.Divide => Divide(left, right),
             BinaryOperator.FloorDivide => FloorDivide(left, right),
             BinaryOperator.Modulo => Modulo(left, right),
+            BinaryOperator.BitwiseOr => BitwiseOr(left, right),
+            BinaryOperator.BitwiseXor => BitwiseXor(left, right),
+            BinaryOperator.BitwiseAnd => BitwiseAnd(left, right),
+            BinaryOperator.ShiftLeft => ShiftLeft(left, right),
+            BinaryOperator.ShiftRight => ShiftRight(left, right),
             _ => throw new InvalidOperationException(
                 $"Operator '{op}' not supported for augmented assignment.")
         };
@@ -603,6 +615,89 @@ public sealed class ModuleEvaluator
             $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
     }
 
+    private static StarlarkValue BitwiseOr(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value | rightInt.Value);
+        }
+
+        if (left is StarlarkDict leftDict && right is StarlarkDict rightDict)
+        {
+            return UnionDict(leftDict, rightDict);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue BitwiseXor(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value ^ rightInt.Value);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue BitwiseAnd(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value & rightInt.Value);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '&' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue ShiftLeft(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value < 0)
+            {
+                throw new InvalidOperationException("shift count must be non-negative.");
+            }
+
+            return new StarlarkInt(leftInt.Value << (int)Math.Min(rightInt.Value, int.MaxValue));
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '<<' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue ShiftRight(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value < 0)
+            {
+                throw new InvalidOperationException("shift count must be non-negative.");
+            }
+
+            return new StarlarkInt(leftInt.Value >> (int)Math.Min(rightInt.Value, int.MaxValue));
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '>>' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkDict UnionDict(StarlarkDict left, StarlarkDict right)
+    {
+        var entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>(left.Entries.Count + right.Entries.Count);
+        entries.AddRange(left.Entries);
+        for (var i = 0; i < right.Entries.Count; i++)
+        {
+            var entry = right.Entries[i];
+            AddOrReplace(entries, entry.Key, entry.Value);
+        }
+
+        return new StarlarkDict(entries);
+    }
+
     private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
     {
         switch (value)
@@ -753,6 +848,45 @@ public sealed class ModuleEvaluator
 
         dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
         dict.MarkMutated();
+    }
+
+    private static void UnionDictInPlace(StarlarkDict dict, StarlarkValue right)
+    {
+        if (right is not StarlarkDict other)
+        {
+            throw new InvalidOperationException(
+                $"Operator '|=' not supported for '{dict.TypeName}' and '{right.TypeName}'.");
+        }
+
+        var mutated = false;
+        for (var i = 0; i < other.Entries.Count; i++)
+        {
+            var entry = other.Entries[i];
+            mutated |= AddOrReplace(dict.Entries, entry.Key, entry.Value);
+        }
+
+        if (mutated)
+        {
+            dict.MarkMutated();
+        }
+    }
+
+    private static bool AddOrReplace(
+        List<KeyValuePair<StarlarkValue, StarlarkValue>> entries,
+        StarlarkValue key,
+        StarlarkValue value)
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (Equals(entries[i].Key, key))
+            {
+                entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
+                return true;
+            }
+        }
+
+        entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        return true;
     }
 
     private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)

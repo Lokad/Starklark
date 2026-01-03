@@ -358,12 +358,19 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule(Rank = 1)]
     public Expression Unary(
-        [T(Token.Minus, Token.Not)] Token op,
+        [T(Token.Plus, Token.Minus, Token.Tilde, Token.Not)] Token op,
         [NT(1)] Expression operand)
     {
-        return new UnaryExpression(
-            op == Token.Minus ? UnaryOperator.Negate : UnaryOperator.Not,
-            operand);
+        var unaryOperator = op switch
+        {
+            Token.Plus => UnaryOperator.Positive,
+            Token.Minus => UnaryOperator.Negate,
+            Token.Tilde => UnaryOperator.BitwiseNot,
+            Token.Not => UnaryOperator.Not,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
+
+        return new UnaryExpression(unaryOperator, operand);
     }
 
     public struct InfixRight
@@ -374,13 +381,18 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public InfixRight AndThen(
-        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.FloorDivide, Token.Percent, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.And, Token.Or)] Token op,
+        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.FloorDivide, Token.Percent, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.And, Token.Or, Token.Pipe, Token.Caret, Token.Ampersand, Token.ShiftLeft, Token.ShiftRight)] Token op,
         [NT(1)] Expression right)
     {
         return new InfixRight
         {
             Operator = op switch
             {
+                Token.Pipe => BinaryOperator.BitwiseOr,
+                Token.Caret => BinaryOperator.BitwiseXor,
+                Token.Ampersand => BinaryOperator.BitwiseAnd,
+                Token.ShiftLeft => BinaryOperator.ShiftLeft,
+                Token.ShiftRight => BinaryOperator.ShiftRight,
                 Token.Plus => BinaryOperator.Add,
                 Token.Minus => BinaryOperator.Subtract,
                 Token.Star => BinaryOperator.Multiply,

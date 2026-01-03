@@ -62,7 +62,9 @@ public sealed class ExpressionEvaluator
         return unary.Operator switch
         {
             UnaryOperator.Not => new StarlarkBool(!operand.IsTruthy),
+            UnaryOperator.Positive => RequireNumber(operand),
             UnaryOperator.Negate => Negate(operand),
+            UnaryOperator.BitwiseNot => BitwiseNot(operand),
             _ => throw new ArgumentOutOfRangeException(nameof(unary.Operator), unary.Operator, null)
         };
     }
@@ -75,6 +77,27 @@ public sealed class ExpressionEvaluator
             StarlarkFloat value => new StarlarkFloat(-value.Value),
             _ => throw new InvalidOperationException(
                 $"Unary '-' not supported for type '{operand.TypeName}'.")
+        };
+    }
+
+    private static StarlarkValue RequireNumber(StarlarkValue operand)
+    {
+        return operand switch
+        {
+            StarlarkInt => operand,
+            StarlarkFloat => operand,
+            _ => throw new InvalidOperationException(
+                $"Unary '+' not supported for type '{operand.TypeName}'.")
+        };
+    }
+
+    private static StarlarkValue BitwiseNot(StarlarkValue operand)
+    {
+        return operand switch
+        {
+            StarlarkInt value => new StarlarkInt(~value.Value),
+            _ => throw new InvalidOperationException(
+                $"Unary '~' not supported for type '{operand.TypeName}'.")
         };
     }
 
@@ -103,6 +126,11 @@ public sealed class ExpressionEvaluator
             BinaryOperator.Divide => Divide(leftValue, rightValue),
             BinaryOperator.FloorDivide => FloorDivide(leftValue, rightValue),
             BinaryOperator.Modulo => Modulo(leftValue, rightValue),
+            BinaryOperator.BitwiseOr => BitwiseOr(leftValue, rightValue),
+            BinaryOperator.BitwiseXor => BitwiseXor(leftValue, rightValue),
+            BinaryOperator.BitwiseAnd => BitwiseAnd(leftValue, rightValue),
+            BinaryOperator.ShiftLeft => ShiftLeft(leftValue, rightValue),
+            BinaryOperator.ShiftRight => ShiftRight(leftValue, rightValue),
             BinaryOperator.Equal => new StarlarkBool(AreEqual(leftValue, rightValue)),
             BinaryOperator.NotEqual => new StarlarkBool(!AreEqual(leftValue, rightValue)),
             BinaryOperator.In => new StarlarkBool(IsIn(leftValue, rightValue)),
@@ -700,6 +728,24 @@ public sealed class ExpressionEvaluator
         return false;
     }
 
+    private static bool AddOrReplace(
+        List<KeyValuePair<StarlarkValue, StarlarkValue>> entries,
+        StarlarkValue key,
+        StarlarkValue value)
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (Equals(entries[i].Key, key))
+            {
+                entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
+                return true;
+            }
+        }
+
+        entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        return true;
+    }
+
     private enum RelationalOperator
     {
         Less,
@@ -1112,6 +1158,89 @@ public sealed class ExpressionEvaluator
 
         throw new InvalidOperationException(
             $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue BitwiseOr(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value | rightInt.Value);
+        }
+
+        if (left is StarlarkDict leftDict && right is StarlarkDict rightDict)
+        {
+            return UnionDict(leftDict, rightDict);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue BitwiseXor(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value ^ rightInt.Value);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue BitwiseAnd(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return new StarlarkInt(leftInt.Value & rightInt.Value);
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '&' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue ShiftLeft(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value < 0)
+            {
+                throw new InvalidOperationException("shift count must be non-negative.");
+            }
+
+            return new StarlarkInt(leftInt.Value << (int)Math.Min(rightInt.Value, int.MaxValue));
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '<<' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkValue ShiftRight(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            if (rightInt.Value < 0)
+            {
+                throw new InvalidOperationException("shift count must be non-negative.");
+            }
+
+            return new StarlarkInt(leftInt.Value >> (int)Math.Min(rightInt.Value, int.MaxValue));
+        }
+
+        throw new InvalidOperationException(
+            $"Operator '>>' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static StarlarkDict UnionDict(StarlarkDict left, StarlarkDict right)
+    {
+        var entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>(left.Entries.Count + right.Entries.Count);
+        entries.AddRange(left.Entries);
+        for (var i = 0; i < right.Entries.Count; i++)
+        {
+            var entry = right.Entries[i];
+            AddOrReplace(entries, entry.Key, entry.Value);
+        }
+
+        return new StarlarkDict(entries);
     }
 
     private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)

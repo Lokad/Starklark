@@ -73,7 +73,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     [Rule]
     public SimpleStatement AugmentedAssignment(
         [NT] Expression target,
-        [T(Token.PlusAssign, Token.MinusAssign, Token.StarAssign, Token.SlashAssign, Token.FloorDivideAssign, Token.PercentAssign)] Token op,
+        [T(Token.PlusAssign, Token.MinusAssign, Token.StarAssign, Token.SlashAssign, Token.FloorDivideAssign, Token.PercentAssign, Token.AmpersandAssign, Token.PipeAssign, Token.CaretAssign, Token.ShiftLeftAssign, Token.ShiftRightAssign)] Token op,
         [NT] Expression value)
     {
         var operatorValue = op switch
@@ -84,6 +84,11 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
             Token.SlashAssign => BinaryOperator.Divide,
             Token.FloorDivideAssign => BinaryOperator.FloorDivide,
             Token.PercentAssign => BinaryOperator.Modulo,
+            Token.AmpersandAssign => BinaryOperator.BitwiseAnd,
+            Token.PipeAssign => BinaryOperator.BitwiseOr,
+            Token.CaretAssign => BinaryOperator.BitwiseXor,
+            Token.ShiftLeftAssign => BinaryOperator.ShiftLeft,
+            Token.ShiftRightAssign => BinaryOperator.ShiftRight,
             _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
         };
 

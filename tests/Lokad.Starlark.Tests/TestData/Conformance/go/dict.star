@@ -33,3 +33,9 @@ assert_eq(d.setdefault("b", 3), 3)
 assert_eq(d, {"a": 1, "b": 3})
 d.update({"b": 4, "c": 5})
 assert_eq(d, {"a": 1, "b": 4, "c": 5})
+---
+assert_eq({"a": 1} | {"a": 2, "b": 3}, {"a": 2, "b": 3})
+d = {"a": 1}
+d |= {"a": 2, "b": 3}
+assert_eq(d, {"a": 2, "b": 3})
+assert_eq(d.keys(), ["a", "b"])
