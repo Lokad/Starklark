@@ -20,3 +20,7 @@ dotnet test    --tl:off --nologo -v minimal --no-build
 ## ExecPlans
 
 When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
+
+## Conformance tests
+
+- Conformance scripts live under `tests/Lokad.Starlark.Tests/TestData/Conformance` and use `---` to split independent cases.

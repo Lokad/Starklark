@@ -121,7 +121,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new AttributeExpression(target, name);
     }
 
-    [Rule(Rank = 3)]
+    [Rule]
     public Expression ListComprehension(
         [T(Token.OpenBracket)] Token open,
         [NT] Expression body,
@@ -183,7 +183,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new DictExpression(entries);
     }
 
-    [Rule(Rank = 3)]
+    [Rule]
     public Expression DictComprehension(
         [T(Token.OpenBrace)] Token open,
         [NT(3)] Expression key,
