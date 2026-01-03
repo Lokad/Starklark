@@ -119,7 +119,18 @@ public sealed class ModuleParsingTests
         var statement = Assert.Single(module.Statements);
         var function = Assert.IsType<FunctionDefinitionStatement>(statement);
         Assert.Equal("add", function.Name);
-        Assert.Equal(new[] { "a", "b" }, function.Parameters);
+        Assert.Collection(
+            function.Parameters,
+            parameter =>
+            {
+                Assert.Equal("a", parameter.Name);
+                Assert.Null(parameter.Default);
+            },
+            parameter =>
+            {
+                Assert.Equal("b", parameter.Name);
+                Assert.Null(parameter.Default);
+            });
         Assert.Single(function.Body);
     }
 

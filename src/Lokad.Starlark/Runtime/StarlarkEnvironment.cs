@@ -47,9 +47,10 @@ public sealed class StarlarkEnvironment
 
     public void AddFunction(
         string name,
-        Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> implementation)
+        Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> implementation,
+        bool isBuiltin = false)
     {
-        _locals[name] = new StarlarkFunction(name, implementation);
+        _locals[name] = new StarlarkFunction(name, implementation, isBuiltin);
     }
 
     public void AddModule(string name, IReadOnlyDictionary<string, StarlarkValue> members)

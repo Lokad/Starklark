@@ -265,4 +265,104 @@ public sealed class ModuleEvaluatorTests
 
         Assert.Equal(new StarlarkString("a2b3c1"), result);
     }
+
+    [Fact]
+    public void ExecutesFunctionDefaults()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "def greet(name, suffix=\"!\"):\n" +
+            "  return name + suffix\n" +
+            "greet(\"hi\")\n",
+            environment);
+
+        Assert.Equal(new StarlarkString("hi!"), result);
+    }
+
+    [Fact]
+    public void ExecutesSortedAndMinMax()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "items = sorted([3, 1, 2])\n" +
+            "min_value = min(items)\n" +
+            "max_value = max(items)\n" +
+            "(items, min_value, max_value)\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkTuple(new StarlarkValue[]
+            {
+                new StarlarkList(new StarlarkValue[]
+                {
+                    new StarlarkInt(1),
+                    new StarlarkInt(2),
+                    new StarlarkInt(3)
+                }),
+                new StarlarkInt(1),
+                new StarlarkInt(3)
+            }),
+            result);
+    }
+
+    [Fact]
+    public void ExecutesEnumerateAndZip()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "pairs = enumerate([\"a\", \"b\"], 1)\n" +
+            "zipped = zip([1, 2], [3, 4])\n" +
+            "(pairs, zipped)\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkTuple(new StarlarkValue[]
+            {
+                new StarlarkList(new StarlarkValue[]
+                {
+                    new StarlarkTuple(new StarlarkValue[] { new StarlarkInt(1), new StarlarkString("a") }),
+                    new StarlarkTuple(new StarlarkValue[] { new StarlarkInt(2), new StarlarkString("b") })
+                }),
+                new StarlarkList(new StarlarkValue[]
+                {
+                    new StarlarkTuple(new StarlarkValue[] { new StarlarkInt(1), new StarlarkInt(3) }),
+                    new StarlarkTuple(new StarlarkValue[] { new StarlarkInt(2), new StarlarkInt(4) })
+                })
+            }),
+            result);
+    }
+
+    [Fact]
+    public void ExecutesDirAndAttributeBuiltins()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "names = dir({})\n" +
+            "has_find = hasattr(\"\", \"find\")\n" +
+            "value = getattr(\"\", \"missing\", 42)\n" +
+            "(names[:3], has_find, value)\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkTuple(new StarlarkValue[]
+            {
+                new StarlarkList(new StarlarkValue[]
+                {
+                    new StarlarkString("clear"),
+                    new StarlarkString("get"),
+                    new StarlarkString("items")
+                }),
+                new StarlarkBool(true),
+                new StarlarkInt(42)
+            }),
+            result);
+    }
 }

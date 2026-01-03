@@ -53,6 +53,7 @@ public static class StarlarkMethods
         return name switch
         {
             "append" => new StarlarkBoundMethod(name, target, ListAppend),
+            "clear" => new StarlarkBoundMethod(name, target, ListClear),
             "extend" => new StarlarkBoundMethod(name, target, ListExtend),
             "insert" => new StarlarkBoundMethod(name, target, ListInsert),
             "remove" => new StarlarkBoundMethod(name, target, ListRemove),
@@ -402,6 +403,17 @@ public static class StarlarkMethods
             list.Items.Add(item);
         }
 
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue ListClear(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "clear");
+        ((StarlarkList)target).Items.Clear();
         return StarlarkNone.Instance;
     }
     private static StarlarkValue ListInsert(

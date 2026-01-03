@@ -36,8 +36,10 @@ public sealed record ForStatement(
 
 public sealed record FunctionDefinitionStatement(
     string Name,
-    IReadOnlyList<string> Parameters,
+    IReadOnlyList<FunctionParameter> Parameters,
     IReadOnlyList<Statement> Body) : Statement;
+
+public sealed record FunctionParameter(string Name, Expression? Default);
 
 public sealed record ReturnStatement(Expression? Value) : Statement;
 

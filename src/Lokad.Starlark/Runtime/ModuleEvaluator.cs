@@ -76,9 +76,11 @@ public sealed class ModuleEvaluator
                     lastValue = ExecuteForStatement(forStatement, environment);
                     break;
                 case FunctionDefinitionStatement functionDefinition:
+                    var (names, defaults) = EvaluateDefaults(functionDefinition, environment);
                     var function = new StarlarkUserFunction(
                         functionDefinition.Name,
-                        functionDefinition.Parameters,
+                        names,
+                        defaults,
                         functionDefinition.Body,
                         environment);
                     environment.Set(functionDefinition.Name, function);
@@ -165,6 +167,27 @@ public sealed class ModuleEvaluator
 
             environment.Set(binding.Alias, value);
         }
+    }
+
+    private static (IReadOnlyList<string> Names, IReadOnlyList<StarlarkValue?> Defaults) EvaluateDefaults(
+        FunctionDefinitionStatement definition,
+        StarlarkEnvironment environment)
+    {
+        var names = new string[definition.Parameters.Count];
+        var defaults = new StarlarkValue?[definition.Parameters.Count];
+        var evaluator = new ExpressionEvaluator();
+
+        for (var i = 0; i < definition.Parameters.Count; i++)
+        {
+            var parameter = definition.Parameters[i];
+            names[i] = parameter.Name;
+            if (parameter.Default != null)
+            {
+                defaults[i] = evaluator.Evaluate(parameter.Default, environment);
+            }
+        }
+
+        return (names, defaults);
     }
 
     private void AssignTarget(AssignmentTarget target, StarlarkValue value, StarlarkEnvironment environment)

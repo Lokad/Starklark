@@ -216,16 +216,29 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         [T(Token.Def)] Token keyword,
         [T(Token.Id)] string name,
         [T(Token.OpenParen)] Token openParen,
-        [L(Sep = Token.Comma)] string[] parameters,
+        [L(Sep = Token.Comma)] FunctionParameter[] parameters,
         [T(Token.CloseParen)] Token closeParen,
         [T(Token.Colon)] Token colon,
         [NT] Suite suite)
     {
+        ValidateParameters(parameters, name);
         return new CompoundStatement(new FunctionDefinitionStatement(name, parameters, suite.Statements));
     }
 
     [Rule]
-    public string ParameterName([T(Token.Id)] string name) => name;
+    public FunctionParameter ParameterName([T(Token.Id)] string name)
+    {
+        return new FunctionParameter(name, null);
+    }
+
+    [Rule]
+    public FunctionParameter ParameterDefault(
+        [T(Token.Id)] string name,
+        [T(Token.Assign)] Token assign,
+        [NT(2)] Expression value)
+    {
+        return new FunctionParameter(name, value);
+    }
 
     [Rule]
     public LoadBinding LoadBindingName([T(Token.String)] string name)
@@ -272,6 +285,26 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
             .Where(statement => statement != null)
             .Select(statement => statement!)
             .ToArray();
+    }
+
+    private static void ValidateParameters(IReadOnlyList<FunctionParameter> parameters, string functionName)
+    {
+        var seenDefault = false;
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            var parameter = parameters[i];
+            if (parameter.Default != null)
+            {
+                seenDefault = true;
+                continue;
+            }
+
+            if (seenDefault)
+            {
+                throw new InvalidOperationException(
+                    $"Non-default parameter '{parameter.Name}' follows default parameter in '{functionName}'.");
+            }
+        }
     }
 }
 

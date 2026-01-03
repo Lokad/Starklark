@@ -85,7 +85,9 @@ public static class StarlarkFormatting
             StarlarkTuple tuple => FormatTuple(tuple.Items),
             StarlarkDict dict => FormatDict(dict.Entries),
             StarlarkRange range => FormatRange(range),
-            StarlarkFunction function => $"<function {function.Name}>",
+            StarlarkFunction function => function.IsBuiltin
+                ? $"<built-in function {function.Name}>"
+                : $"<function {function.Name}>",
             StarlarkUserFunction function => $"<function {function.Name}>",
             StarlarkBoundMethod method => $"<bound method {method.Name}>",
             StarlarkCallable => "<function>",

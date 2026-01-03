@@ -273,14 +273,17 @@ public sealed class StarlarkFunction : StarlarkCallable
 {
     public StarlarkFunction(
         string name,
-        Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> invoke)
+        Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> invoke,
+        bool isBuiltin = false)
     {
         Name = name;
         Invoke = invoke;
+        IsBuiltin = isBuiltin;
     }
 
     public string Name { get; }
     public Func<IReadOnlyList<StarlarkValue>, IReadOnlyDictionary<string, StarlarkValue>, StarlarkValue> Invoke { get; }
+    public bool IsBuiltin { get; }
 
     public override StarlarkValue Call(
         IReadOnlyList<StarlarkValue> args,
@@ -313,17 +316,20 @@ public sealed class StarlarkUserFunction : StarlarkCallable
     public StarlarkUserFunction(
         string name,
         IReadOnlyList<string> parameters,
+        IReadOnlyList<StarlarkValue?> defaults,
         IReadOnlyList<Lokad.Starlark.Syntax.Statement> body,
         StarlarkEnvironment closure)
     {
         Name = name;
         Parameters = parameters;
+        Defaults = defaults;
         Body = body;
         Closure = closure;
     }
 
     public string Name { get; }
     public IReadOnlyList<string> Parameters { get; }
+    public IReadOnlyList<StarlarkValue?> Defaults { get; }
     public IReadOnlyList<Lokad.Starlark.Syntax.Statement> Body { get; }
     public StarlarkEnvironment Closure { get; }
 
@@ -337,7 +343,13 @@ public sealed class StarlarkUserFunction : StarlarkCallable
                 $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count}.");
         }
 
-        var values = new StarlarkValue[Parameters.Count];
+        if (Defaults.Count != Parameters.Count)
+        {
+            throw new InvalidOperationException(
+                $"Function '{Name}' has inconsistent defaults.");
+        }
+
+        var values = new StarlarkValue?[Parameters.Count];
         for (var i = 0; i < args.Count; i++)
         {
             values[i] = args[i];
@@ -374,6 +386,11 @@ public sealed class StarlarkUserFunction : StarlarkCallable
 
         for (var i = 0; i < values.Length; i++)
         {
+            if (values[i] == null && Defaults[i] != null)
+            {
+                values[i] = Defaults[i];
+            }
+
             if (values[i] == null)
             {
                 throw new InvalidOperationException(
@@ -384,7 +401,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         var callEnvironment = Closure.CreateChild();
         for (var i = 0; i < Parameters.Count; i++)
         {
-            callEnvironment.Set(Parameters[i], values[i]);
+            callEnvironment.Set(Parameters[i], values[i]!);
         }
 
         var evaluator = new ModuleEvaluator();

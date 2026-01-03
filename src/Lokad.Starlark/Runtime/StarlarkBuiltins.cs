@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace Lokad.Starlark.Runtime;
 
@@ -7,18 +8,29 @@ public static class StarlarkBuiltins
 {
     public static void Register(StarlarkEnvironment environment)
     {
-        environment.AddFunction("len", Len);
-        environment.AddFunction("range", Range);
-        environment.AddFunction("list", List);
-        environment.AddFunction("tuple", Tuple);
-        environment.AddFunction("bool", Bool);
-        environment.AddFunction("any", Any);
-        environment.AddFunction("all", All);
-        environment.AddFunction("dict", Dict);
-        environment.AddFunction("str", Str);
-        environment.AddFunction("int", Int);
-        environment.AddFunction("float", Float);
-        environment.AddFunction("type", Type);
+        environment.AddFunction("len", Len, isBuiltin: true);
+        environment.AddFunction("range", Range, isBuiltin: true);
+        environment.AddFunction("list", List, isBuiltin: true);
+        environment.AddFunction("tuple", Tuple, isBuiltin: true);
+        environment.AddFunction("bool", Bool, isBuiltin: true);
+        environment.AddFunction("any", Any, isBuiltin: true);
+        environment.AddFunction("all", All, isBuiltin: true);
+        environment.AddFunction("dict", Dict, isBuiltin: true);
+        environment.AddFunction("str", Str, isBuiltin: true);
+        environment.AddFunction("int", Int, isBuiltin: true);
+        environment.AddFunction("float", Float, isBuiltin: true);
+        environment.AddFunction("type", Type, isBuiltin: true);
+        environment.AddFunction("repr", Repr, isBuiltin: true);
+        environment.AddFunction("sorted", Sorted, isBuiltin: true);
+        environment.AddFunction("reversed", Reversed, isBuiltin: true);
+        environment.AddFunction("min", Min, isBuiltin: true);
+        environment.AddFunction("max", Max, isBuiltin: true);
+        environment.AddFunction("enumerate", Enumerate, isBuiltin: true);
+        environment.AddFunction("zip", Zip, isBuiltin: true);
+        environment.AddFunction("dir", Dir, isBuiltin: true);
+        environment.AddFunction("getattr", GetAttr, isBuiltin: true);
+        environment.AddFunction("hasattr", HasAttr, isBuiltin: true);
+        environment.AddFunction("fail", Fail, isBuiltin: true);
     }
 
     private static StarlarkValue Len(
@@ -206,40 +218,73 @@ public static class StarlarkBuiltins
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        ExpectNoKeywords(kwargs);
         if (args.Count is < 1 or > 2)
         {
             throw new InvalidOperationException("int expects 1 or 2 arguments.");
         }
 
         var value = args[0];
+        var baseValue = 10;
+        var baseProvided = false;
+        if (args.Count == 2)
+        {
+            baseValue = checked((int)RequireInt(args[1]));
+            baseProvided = true;
+        }
+
+        if (kwargs.Count > 0)
+        {
+            if (kwargs.Count > 1 || !kwargs.TryGetValue("base", out var baseArg))
+            {
+                throw new InvalidOperationException("int only supports the 'base' keyword.");
+            }
+
+            if (args.Count == 2)
+            {
+                throw new InvalidOperationException("int base specified twice.");
+            }
+
+            baseValue = checked((int)RequireInt(baseArg));
+            baseProvided = true;
+        }
+
+        if (baseValue != 0 && baseValue is < 2 or > 36)
+        {
+            throw new InvalidOperationException("int base must be between 2 and 36.");
+        }
+
         if (value is StarlarkInt intValue)
         {
+            if (baseProvided)
+            {
+                throw new InvalidOperationException("int base is only valid for string arguments.");
+            }
+
             return intValue;
         }
 
         if (value is StarlarkBool boolValue)
         {
+            if (baseProvided)
+            {
+                throw new InvalidOperationException("int base is only valid for string arguments.");
+            }
+
             return new StarlarkInt(boolValue.Value ? 1 : 0);
         }
 
         if (value is StarlarkFloat floatValue)
         {
+            if (baseProvided)
+            {
+                throw new InvalidOperationException("int base is only valid for string arguments.");
+            }
+
             return new StarlarkInt((long)floatValue.Value);
         }
 
         if (value is StarlarkString text)
         {
-            var baseValue = 10;
-            if (args.Count == 2)
-            {
-                baseValue = checked((int)RequireInt(args[1]));
-                if (baseValue is < 2 or > 36)
-                {
-                    throw new InvalidOperationException("int base must be between 2 and 36.");
-                }
-            }
-
             if (!TryParseInt(text.Value, baseValue, out var parsed))
             {
                 throw new InvalidOperationException($"Invalid int literal: '{text.Value}'.");
@@ -281,6 +326,442 @@ public static class StarlarkBuiltins
         return new StarlarkString(args[0].TypeName);
     }
 
+    private static StarlarkValue Repr(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1);
+        return new StarlarkString(StarlarkFormatting.ToRepr(args[0]));
+    }
+
+    private static StarlarkValue Sorted(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        if (args.Count != 1)
+        {
+            throw new InvalidOperationException("sorted expects 1 argument.");
+        }
+
+        var keyFunction = ExtractKey(kwargs, out var reverse);
+        var items = EnumerateIterable(args[0]).ToList();
+        if (keyFunction != null)
+        {
+            var keyed = items
+                .Select((item, index) => new SortKey(index, item, keyFunction.Call(new[] { item }, EmptyKeywords)))
+                .ToList();
+            keyed.Sort((left, right) =>
+            {
+                var compare = CompareValues(left.Key, right.Key);
+                if (compare == 0)
+                {
+                    return left.Index.CompareTo(right.Index);
+                }
+
+                return compare;
+            });
+
+            if (reverse)
+            {
+                keyed.Reverse();
+            }
+
+            return new StarlarkList(keyed.Select(entry => entry.Value).ToList());
+        }
+
+        items.Sort(CompareValues);
+        if (reverse)
+        {
+            items.Reverse();
+        }
+
+        return new StarlarkList(items);
+    }
+
+    private static StarlarkValue Reversed(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1);
+        return args[0] switch
+        {
+            StarlarkList list => new StarlarkList(list.Items.AsEnumerable().Reverse().ToList()),
+            StarlarkTuple tuple => new StarlarkList(tuple.Items.Reverse().ToList()),
+            _ => throw new InvalidOperationException("reversed expects a list or tuple.")
+        };
+    }
+
+    private static StarlarkValue Min(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        return MinMax(args, kwargs, findMax: false, name: "min");
+    }
+
+    private static StarlarkValue Max(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        return MinMax(args, kwargs, findMax: true, name: "max");
+    }
+
+    private static StarlarkValue Enumerate(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        if (args.Count is < 1 or > 2)
+        {
+            throw new InvalidOperationException("enumerate expects 1 or 2 arguments.");
+        }
+
+        if (kwargs.Count > 0 && !kwargs.ContainsKey("start"))
+        {
+            throw new InvalidOperationException("enumerate only supports the 'start' keyword.");
+        }
+
+        var start = args.Count == 2 ? RequireInt(args[1]) : 0;
+        if (kwargs.TryGetValue("start", out var startValue))
+        {
+            if (args.Count == 2)
+            {
+                throw new InvalidOperationException("enumerate start specified twice.");
+            }
+
+            start = RequireInt(startValue);
+        }
+
+        var result = new List<StarlarkValue>();
+        var index = start;
+        foreach (var item in EnumerateIterable(args[0]))
+        {
+            result.Add(new StarlarkTuple(new StarlarkValue[] { new StarlarkInt(index), item }));
+            index++;
+        }
+
+        return new StarlarkList(result);
+    }
+
+    private static StarlarkValue Zip(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        if (args.Count == 0)
+        {
+            return new StarlarkList(Array.Empty<StarlarkValue>());
+        }
+
+        var lists = args.Select(arg => EnumerateIterable(arg).ToList()).ToList();
+        var length = lists.Min(list => list.Count);
+        var result = new List<StarlarkValue>(length);
+
+        for (var i = 0; i < length; i++)
+        {
+            var row = new StarlarkValue[lists.Count];
+            for (var j = 0; j < lists.Count; j++)
+            {
+                row[j] = lists[j][i];
+            }
+
+            result.Add(new StarlarkTuple(row));
+        }
+
+        return new StarlarkList(result);
+    }
+
+    private static StarlarkValue Dir(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1);
+
+        var names = GetDirMembers(args[0]);
+        names.Sort(StringComparer.Ordinal);
+        return new StarlarkList(names.Select(name => new StarlarkString(name)).ToList());
+    }
+
+    private static StarlarkValue GetAttr(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        if (args.Count is < 2 or > 3)
+        {
+            throw new InvalidOperationException("getattr expects 2 or 3 arguments.");
+        }
+
+        if (args[1] is not StarlarkString name)
+        {
+            throw new InvalidOperationException("getattr expects a string attribute name.");
+        }
+
+        try
+        {
+            return StarlarkMethods.Bind(args[0], name.Value);
+        }
+        catch (InvalidOperationException)
+        {
+            if (args.Count == 3)
+            {
+                return args[2];
+            }
+
+            throw;
+        }
+    }
+
+    private static StarlarkValue HasAttr(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 2);
+        if (args[1] is not StarlarkString name)
+        {
+            throw new InvalidOperationException("hasattr expects a string attribute name.");
+        }
+
+        try
+        {
+            StarlarkMethods.Bind(args[0], name.Value);
+            return new StarlarkBool(true);
+        }
+        catch (InvalidOperationException)
+        {
+            return new StarlarkBool(false);
+        }
+    }
+
+    private static StarlarkValue Fail(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        var separator = " ";
+        if (kwargs.Count > 0)
+        {
+            if (kwargs.Count > 1 || !kwargs.TryGetValue("sep", out var sepValue))
+            {
+                throw new InvalidOperationException("fail only supports the 'sep' keyword.");
+            }
+
+            separator = RequireString(sepValue);
+        }
+
+        if (args.Count == 0)
+        {
+            throw new InvalidOperationException("fail");
+        }
+
+        var parts = args.Select(arg => StarlarkFormatting.ToString(arg));
+        throw new InvalidOperationException(string.Join(separator, parts));
+    }
+
+    private static readonly IReadOnlyDictionary<string, StarlarkValue> EmptyKeywords =
+        new Dictionary<string, StarlarkValue>();
+
+    private static StarlarkCallable? ExtractKey(
+        IReadOnlyDictionary<string, StarlarkValue> kwargs,
+        out bool reverse)
+    {
+        reverse = false;
+        StarlarkCallable? key = null;
+
+        foreach (var pair in kwargs)
+        {
+            if (pair.Key == "key")
+            {
+                if (pair.Value is not StarlarkCallable callable)
+                {
+                    throw new InvalidOperationException("key must be callable.");
+                }
+
+                key = callable;
+            }
+            else if (pair.Key == "reverse")
+            {
+                if (pair.Value is not StarlarkBool boolValue)
+                {
+                    throw new InvalidOperationException("reverse must be a bool.");
+                }
+
+                reverse = boolValue.Value;
+            }
+            else
+            {
+                throw new InvalidOperationException("Unexpected keyword arguments.");
+            }
+        }
+
+        return key;
+    }
+
+    private static StarlarkValue MinMax(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs,
+        bool findMax,
+        string name)
+    {
+        if (args.Count == 0)
+        {
+            throw new InvalidOperationException($"{name} expects at least one argument.");
+        }
+
+        var keyFunction = ExtractKeyOnly(kwargs, name);
+        var values = args.Count == 1
+            ? EnumerateIterable(args[0]).ToList()
+            : args.ToList();
+
+        if (values.Count == 0)
+        {
+            throw new InvalidOperationException($"{name} expects at least one item.");
+        }
+
+        var best = values[0];
+        var bestKey = keyFunction != null ? keyFunction.Call(new[] { best }, EmptyKeywords) : best;
+        for (var i = 1; i < values.Count; i++)
+        {
+            var candidate = values[i];
+            var candidateKey = keyFunction != null
+                ? keyFunction.Call(new[] { candidate }, EmptyKeywords)
+                : candidate;
+            var compare = CompareValues(candidateKey, bestKey);
+            if (findMax ? compare > 0 : compare < 0)
+            {
+                best = candidate;
+                bestKey = candidateKey;
+            }
+        }
+
+        return best;
+    }
+
+    private static StarlarkCallable? ExtractKeyOnly(
+        IReadOnlyDictionary<string, StarlarkValue> kwargs,
+        string name)
+    {
+        if (kwargs.Count == 0)
+        {
+            return null;
+        }
+
+        if (kwargs.Count > 1 || !kwargs.TryGetValue("key", out var keyValue))
+        {
+            throw new InvalidOperationException($"{name} only supports the 'key' keyword.");
+        }
+
+        if (keyValue is not StarlarkCallable callable)
+        {
+            throw new InvalidOperationException("key must be callable.");
+        }
+
+        return callable;
+    }
+
+    private static int CompareValues(StarlarkValue left, StarlarkValue right)
+    {
+        if (TryGetNumber(left, out var leftNumber, out _)
+            && TryGetNumber(right, out var rightNumber, out _))
+        {
+            return leftNumber.CompareTo(rightNumber);
+        }
+
+        if (left is StarlarkString leftString && right is StarlarkString rightString)
+        {
+            return string.Compare(leftString.Value, rightString.Value, StringComparison.Ordinal);
+        }
+
+        throw new InvalidOperationException(
+            $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
+    {
+        switch (value)
+        {
+            case StarlarkInt intValue:
+                number = intValue.Value;
+                isInt = true;
+                return true;
+            case StarlarkFloat floatValue:
+                number = floatValue.Value;
+                isInt = false;
+                return true;
+            default:
+                number = 0;
+                isInt = false;
+                return false;
+        }
+    }
+
+    private static List<string> GetDirMembers(StarlarkValue value)
+    {
+        return value switch
+        {
+            StarlarkString => new List<string>
+            {
+                "count",
+                "endswith",
+                "find",
+                "format",
+                "join",
+                "lower",
+                "partition",
+                "replace",
+                "rfind",
+                "rpartition",
+                "rsplit",
+                "split",
+                "splitlines",
+                "startswith",
+                "strip",
+                "title",
+                "upper",
+                "lstrip",
+                "rstrip"
+            },
+            StarlarkList => new List<string>
+            {
+                "append",
+                "clear",
+                "extend",
+                "index",
+                "insert",
+                "pop",
+                "remove"
+            },
+            StarlarkDict => new List<string>
+            {
+                "clear",
+                "get",
+                "items",
+                "keys",
+                "pop",
+                "popitem",
+                "setdefault",
+                "update",
+                "values"
+            },
+            _ => new List<string>()
+        };
+    }
+
+    private static IEnumerable<StarlarkValue> EnumerateIterable(StarlarkValue value)
+    {
+        return value switch
+        {
+            StarlarkList list => list.Items,
+            StarlarkTuple tuple => tuple.Items,
+            StarlarkDict dict => EnumerateDictKeys(dict),
+            StarlarkRange range => EnumerateRange(range),
+            _ => throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.")
+        };
+    }
+
+    private readonly record struct SortKey(int Index, StarlarkValue Value, StarlarkValue Key);
+
     private static long RequireInt(StarlarkValue value)
     {
         if (value is StarlarkInt intValue)
@@ -291,6 +772,16 @@ public static class StarlarkBuiltins
         throw new InvalidOperationException($"Expected int, got '{value.TypeName}'.");
     }
 
+    private static string RequireString(StarlarkValue value)
+    {
+        if (value is StarlarkString text)
+        {
+            return text.Value;
+        }
+
+        throw new InvalidOperationException($"Expected string, got '{value.TypeName}'.");
+    }
+
     private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue value)
     {
         switch (value)
@@ -299,22 +790,12 @@ public static class StarlarkBuiltins
                 return list.Items;
             case StarlarkTuple tuple:
                 return tuple.Items;
-            case StarlarkString text:
-                return EnumerateString(text.Value);
             case StarlarkDict dict:
                 return EnumerateDictKeys(dict);
             case StarlarkRange range:
                 return EnumerateRange(range);
             default:
                 throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.");
-        }
-    }
-
-    private static IEnumerable<StarlarkValue> EnumerateString(string text)
-    {
-        foreach (var ch in text)
-        {
-            yield return new StarlarkString(ch.ToString());
         }
     }
 
@@ -417,7 +898,33 @@ public static class StarlarkBuiltins
 
         try
         {
-            var parsed = Convert.ToInt64(trimmed[startIndex..], baseValue);
+            var slice = trimmed[startIndex..];
+            var resolvedBase = baseValue;
+            if (resolvedBase == 0)
+            {
+                resolvedBase = InferBase(slice);
+                if (resolvedBase == 0)
+                {
+                    value = 0;
+                    return false;
+                }
+            }
+
+            if (resolvedBase != 10 && slice.Length >= 2 && slice[0] == '0')
+            {
+                var prefix = char.ToLowerInvariant(slice[1]);
+                if (prefix == 'x' || prefix == 'o' || prefix == 'b')
+                {
+                    slice = slice[2..];
+                    if (slice.Length == 0)
+                    {
+                        value = 0;
+                        return false;
+                    }
+                }
+            }
+
+            var parsed = Convert.ToInt64(slice, resolvedBase);
             value = parsed * sign;
             return true;
         }
@@ -431,5 +938,26 @@ public static class StarlarkBuiltins
             value = 0;
             return false;
         }
+    }
+
+    private static int InferBase(string value)
+    {
+        if (value.All(ch => ch == '0'))
+        {
+            return 10;
+        }
+
+        if (value.Length < 2 || value[0] != '0')
+        {
+            return 10;
+        }
+
+        return char.ToLowerInvariant(value[1]) switch
+        {
+            'x' => 16,
+            'o' => 8,
+            'b' => 2,
+            _ => 0
+        };
     }
 }
