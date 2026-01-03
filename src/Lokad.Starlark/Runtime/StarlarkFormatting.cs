@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Lokad.Starlark.Runtime;
@@ -74,6 +75,12 @@ public static class StarlarkFormatting
 
     private static string Format(StarlarkValue value, bool quoteStrings)
     {
+        var state = new FormattingState();
+        return Format(value, quoteStrings, state);
+    }
+
+    private static string Format(StarlarkValue value, bool quoteStrings, FormattingState state)
+    {
         return value switch
         {
             StarlarkString text => quoteStrings ? Quote(text.Value) : text.Value,
@@ -81,9 +88,9 @@ public static class StarlarkFormatting
             StarlarkNone => "None",
             StarlarkInt integer => integer.Value.ToString(CultureInfo.InvariantCulture),
             StarlarkFloat number => number.Value.ToString("G", CultureInfo.InvariantCulture),
-            StarlarkList list => FormatList(list.Items),
-            StarlarkTuple tuple => FormatTuple(tuple.Items),
-            StarlarkDict dict => FormatDict(dict.Entries),
+            StarlarkList list => FormatList(list, state),
+            StarlarkTuple tuple => FormatTuple(tuple, state),
+            StarlarkDict dict => FormatDict(dict, state),
             StarlarkRange range => FormatRange(range),
             StarlarkFunction function => function.IsBuiltin
                 ? $"<built-in function {function.Name}>"
@@ -95,64 +102,70 @@ public static class StarlarkFormatting
         };
     }
 
-    private static string FormatList(IReadOnlyList<StarlarkValue> items)
+    private static string FormatList(StarlarkList list, FormattingState state)
     {
+        state.Enter(list);
         var builder = new StringBuilder();
         builder.Append('[');
-        for (var i = 0; i < items.Count; i++)
+        for (var i = 0; i < list.Items.Count; i++)
         {
             if (i > 0)
             {
                 builder.Append(", ");
             }
 
-            builder.Append(ToRepr(items[i]));
+            builder.Append(Format(list.Items[i], quoteStrings: true, state));
         }
 
         builder.Append(']');
+        state.Exit(list);
         return builder.ToString();
     }
 
-    private static string FormatTuple(IReadOnlyList<StarlarkValue> items)
+    private static string FormatTuple(StarlarkTuple tuple, FormattingState state)
     {
+        state.Enter(tuple);
         var builder = new StringBuilder();
         builder.Append('(');
-        for (var i = 0; i < items.Count; i++)
+        for (var i = 0; i < tuple.Items.Count; i++)
         {
             if (i > 0)
             {
                 builder.Append(", ");
             }
 
-            builder.Append(ToRepr(items[i]));
+            builder.Append(Format(tuple.Items[i], quoteStrings: true, state));
         }
 
-        if (items.Count == 1)
+        if (tuple.Items.Count == 1)
         {
             builder.Append(',');
         }
 
         builder.Append(')');
+        state.Exit(tuple);
         return builder.ToString();
     }
 
-    private static string FormatDict(IReadOnlyList<KeyValuePair<StarlarkValue, StarlarkValue>> entries)
+    private static string FormatDict(StarlarkDict dict, FormattingState state)
     {
+        state.Enter(dict);
         var builder = new StringBuilder();
         builder.Append('{');
-        for (var i = 0; i < entries.Count; i++)
+        for (var i = 0; i < dict.Entries.Count; i++)
         {
             if (i > 0)
             {
                 builder.Append(", ");
             }
 
-            builder.Append(ToRepr(entries[i].Key));
+            builder.Append(Format(dict.Entries[i].Key, quoteStrings: true, state));
             builder.Append(": ");
-            builder.Append(ToRepr(entries[i].Value));
+            builder.Append(Format(dict.Entries[i].Value, quoteStrings: true, state));
         }
 
         builder.Append('}');
+        state.Exit(dict);
         return builder.ToString();
     }
 
@@ -559,5 +572,33 @@ public static class StarlarkFormatting
         public bool SpaceSign;
         public bool ZeroPad;
         public bool Alternate;
+    }
+
+    private sealed class FormattingState
+    {
+        private readonly HashSet<object> _active =
+            new HashSet<object>(ReferenceEqualityComparer.Instance);
+
+        public void Enter(object value)
+        {
+            if (!_active.Add(value))
+            {
+                throw new InvalidOperationException("maximum recursion");
+            }
+        }
+
+        public void Exit(object value)
+        {
+            _active.Remove(value);
+        }
+    }
+
+    private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+    {
+        public static readonly ReferenceEqualityComparer Instance = new ReferenceEqualityComparer();
+
+        public new bool Equals(object? x, object? y) => ReferenceEquals(x, y);
+
+        public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
     }
 }

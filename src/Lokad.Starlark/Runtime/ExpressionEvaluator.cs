@@ -618,37 +618,7 @@ public sealed class ExpressionEvaluator
 
     private static bool AreEqual(StarlarkValue left, StarlarkValue right)
     {
-        if (TryGetNumber(left, out _, out _) && TryGetNumber(right, out _, out _))
-        {
-            return EqualNumbers(left, right);
-        }
-
-        return Equals(left, right);
-    }
-
-    private static bool EqualNumbers(StarlarkValue left, StarlarkValue right)
-    {
-        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
-        {
-            return leftInt.Value == rightInt.Value;
-        }
-
-        if (left is StarlarkFloat leftFloat && right is StarlarkFloat rightFloat)
-        {
-            return StarlarkNumber.EqualFloatFloat(leftFloat.Value, rightFloat.Value);
-        }
-
-        if (left is StarlarkInt leftNumber && right is StarlarkFloat rightNumber)
-        {
-            return StarlarkNumber.EqualIntFloat(leftNumber.Value, rightNumber.Value);
-        }
-
-        if (left is StarlarkFloat leftFloatNumber && right is StarlarkInt rightIntNumber)
-        {
-            return StarlarkNumber.EqualIntFloat(rightIntNumber.Value, leftFloatNumber.Value);
-        }
-
-        return false;
+        return StarlarkEquality.AreEqual(left, right);
     }
 
     private static bool CompareRelational(StarlarkValue left, StarlarkValue right, RelationalOperator op)

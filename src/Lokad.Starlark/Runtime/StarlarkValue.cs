@@ -144,12 +144,7 @@ public sealed class StarlarkList : StarlarkValue
 
     public override bool Equals(object? obj)
     {
-        if (ReferenceEquals(this, obj))
-        {
-            return true;
-        }
-
-        return obj is StarlarkList other && Items.SequenceEqual(other.Items);
+        return obj is StarlarkList other && StarlarkEquality.AreEqual(this, other);
     }
 
     public override int GetHashCode()
@@ -172,12 +167,7 @@ public sealed class StarlarkTuple : StarlarkValue
 
     public override bool Equals(object? obj)
     {
-        if (ReferenceEquals(this, obj))
-        {
-            return true;
-        }
-
-        return obj is StarlarkTuple other && Items.SequenceEqual(other.Items);
+        return obj is StarlarkTuple other && StarlarkEquality.AreEqual(this, other);
     }
 
     public override int GetHashCode()
@@ -224,35 +214,7 @@ public sealed class StarlarkDict : StarlarkValue
 
     public override bool Equals(object? obj)
     {
-        if (ReferenceEquals(this, obj))
-        {
-            return true;
-        }
-
-        if (obj is not StarlarkDict other)
-        {
-            return false;
-        }
-
-        if (Entries.Count != other.Entries.Count)
-        {
-            return false;
-        }
-
-        foreach (var entry in Entries)
-        {
-            if (!TryGetEntryValue(other, entry.Key, out var otherValue))
-            {
-                return false;
-            }
-
-            if (!Equals(entry.Value, otherValue))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return obj is StarlarkDict other && StarlarkEquality.AreEqual(this, other);
     }
 
     public override int GetHashCode()
@@ -260,20 +222,6 @@ public sealed class StarlarkDict : StarlarkValue
         throw new InvalidOperationException("unhashable type: 'dict'.");
     }
 
-    private static bool TryGetEntryValue(StarlarkDict dict, StarlarkValue key, out StarlarkValue value)
-    {
-        foreach (var entry in dict.Entries)
-        {
-            if (Equals(entry.Key, key))
-            {
-                value = entry.Value;
-                return true;
-            }
-        }
-
-        value = StarlarkNone.Instance;
-        return false;
-    }
 }
 
 public sealed class StarlarkRange : StarlarkValue, IEquatable<StarlarkRange>
