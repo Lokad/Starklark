@@ -39,7 +39,14 @@ public sealed record FunctionDefinitionStatement(
     IReadOnlyList<FunctionParameter> Parameters,
     IReadOnlyList<Statement> Body) : Statement;
 
-public sealed record FunctionParameter(string Name, Expression? Default);
+public sealed record FunctionParameter(string Name, Expression? Default, ParameterKind Kind);
+
+public enum ParameterKind
+{
+    Normal,
+    VarArgs,
+    KwArgs
+}
 
 public sealed record ReturnStatement(Expression? Value) : Statement;
 

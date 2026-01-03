@@ -39,6 +39,7 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.Plus => "'+'",
             Token.Minus => "'-'",
             Token.Star => "'*'",
+            Token.StarStar => "'**'",
             Token.Slash => "'/'",
             Token.OpenParen => "'('",
             Token.CloseParen => "')'",

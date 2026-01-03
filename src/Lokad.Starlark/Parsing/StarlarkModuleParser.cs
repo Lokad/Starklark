@@ -228,7 +228,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     [Rule]
     public FunctionParameter ParameterName([T(Token.Id)] string name)
     {
-        return new FunctionParameter(name, null);
+        return new FunctionParameter(name, null, ParameterKind.Normal);
     }
 
     [Rule]
@@ -237,7 +237,23 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         [T(Token.Assign)] Token assign,
         [NT(2)] Expression value)
     {
-        return new FunctionParameter(name, value);
+        return new FunctionParameter(name, value, ParameterKind.Normal);
+    }
+
+    [Rule]
+    public FunctionParameter ParameterVarArgs(
+        [T(Token.Star)] Token star,
+        [T(Token.Id)] string name)
+    {
+        return new FunctionParameter(name, null, ParameterKind.VarArgs);
+    }
+
+    [Rule]
+    public FunctionParameter ParameterKwArgs(
+        [T(Token.StarStar)] Token star,
+        [T(Token.Id)] string name)
+    {
+        return new FunctionParameter(name, null, ParameterKind.KwArgs);
     }
 
     [Rule]
@@ -290,9 +306,59 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     private static void ValidateParameters(IReadOnlyList<FunctionParameter> parameters, string functionName)
     {
         var seenDefault = false;
+        var seenVarArgs = false;
+        var seenKwArgs = false;
         for (var i = 0; i < parameters.Count; i++)
         {
             var parameter = parameters[i];
+            if (parameter.Kind == ParameterKind.VarArgs)
+            {
+                if (seenVarArgs)
+                {
+                    throw new InvalidOperationException(
+                        $"Multiple *args parameters in '{functionName}'.");
+                }
+
+                if (seenKwArgs)
+                {
+                    throw new InvalidOperationException(
+                        $"*args must appear before **kwargs in '{functionName}'.");
+                }
+
+                if (parameter.Default != null)
+                {
+                    throw new InvalidOperationException(
+                        $"*args parameter '{parameter.Name}' cannot have a default in '{functionName}'.");
+                }
+
+                seenVarArgs = true;
+                continue;
+            }
+
+            if (parameter.Kind == ParameterKind.KwArgs)
+            {
+                if (seenKwArgs)
+                {
+                    throw new InvalidOperationException(
+                        $"Multiple **kwargs parameters in '{functionName}'.");
+                }
+
+                if (parameter.Default != null)
+                {
+                    throw new InvalidOperationException(
+                        $"**kwargs parameter '{parameter.Name}' cannot have a default in '{functionName}'.");
+                }
+
+                seenKwArgs = true;
+                continue;
+            }
+
+            if (seenVarArgs || seenKwArgs)
+            {
+                throw new InvalidOperationException(
+                    $"Parameter '{parameter.Name}' must appear before *args or **kwargs in '{functionName}'.");
+            }
+
             if (parameter.Default != null)
             {
                 seenDefault = true;

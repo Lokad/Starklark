@@ -85,13 +85,29 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [T(Token.Assign)] Token assign,
         [NT(2)] Expression value)
     {
-        return new CallArgument(name, value);
+        return new CallArgument(CallArgumentKind.Keyword, name, value);
     }
 
     [Rule]
     public CallArgument PositionalArgument([NT(2)] Expression value)
     {
-        return new CallArgument(null, value);
+        return new CallArgument(CallArgumentKind.Positional, null, value);
+    }
+
+    [Rule]
+    public CallArgument StarArgument(
+        [T(Token.Star)] Token star,
+        [NT(2)] Expression value)
+    {
+        return new CallArgument(CallArgumentKind.Star, null, value);
+    }
+
+    [Rule]
+    public CallArgument StarStarArgument(
+        [T(Token.StarStar)] Token star,
+        [NT(2)] Expression value)
+    {
+        return new CallArgument(CallArgumentKind.StarStar, null, value);
     }
 
     [Rule]

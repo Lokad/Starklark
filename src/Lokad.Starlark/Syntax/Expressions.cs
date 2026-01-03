@@ -14,7 +14,7 @@ public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, 
 
 public sealed record CallExpression(Expression Callee, IReadOnlyList<CallArgument> Arguments) : Expression;
 
-public sealed record CallArgument(string? Name, Expression Value);
+public sealed record CallArgument(CallArgumentKind Kind, string? Name, Expression Value);
 
 public sealed record ListExpression(IReadOnlyList<Expression> Items) : Expression;
 
@@ -38,6 +38,14 @@ public sealed record ConditionalExpression(
     Expression Condition,
     Expression ThenExpression,
     Expression ElseExpression) : Expression;
+
+public enum CallArgumentKind
+{
+    Positional,
+    Keyword,
+    Star,
+    StarStar
+}
 
 public enum UnaryOperator
 {

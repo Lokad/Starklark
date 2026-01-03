@@ -125,13 +125,36 @@ public sealed class ModuleParsingTests
             {
                 Assert.Equal("a", parameter.Name);
                 Assert.Null(parameter.Default);
+                Assert.Equal(ParameterKind.Normal, parameter.Kind);
             },
             parameter =>
             {
                 Assert.Equal("b", parameter.Name);
                 Assert.Null(parameter.Default);
+                Assert.Equal(ParameterKind.Normal, parameter.Kind);
             });
         Assert.Single(function.Body);
+    }
+
+    [Fact]
+    public void ParsesVariadicFunctionDefinition()
+    {
+        var module = StarlarkModuleParser.ParseModule("def f(*args, **kwargs):\n  return (args, kwargs)\n");
+
+        var statement = Assert.Single(module.Statements);
+        var function = Assert.IsType<FunctionDefinitionStatement>(statement);
+        Assert.Collection(
+            function.Parameters,
+            parameter =>
+            {
+                Assert.Equal("args", parameter.Name);
+                Assert.Equal(ParameterKind.VarArgs, parameter.Kind);
+            },
+            parameter =>
+            {
+                Assert.Equal("kwargs", parameter.Name);
+                Assert.Equal(ParameterKind.KwArgs, parameter.Kind);
+            });
     }
 
     [Fact]

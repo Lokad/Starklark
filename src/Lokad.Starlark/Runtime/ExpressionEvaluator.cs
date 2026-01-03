@@ -132,29 +132,76 @@ public sealed class ExpressionEvaluator
         var args = new List<StarlarkValue>(call.Arguments.Count);
         var kwargs = new Dictionary<string, StarlarkValue>(StringComparer.Ordinal);
         var seenKeyword = false;
+        var seenStar = false;
+        var seenStarStar = false;
 
         for (var i = 0; i < call.Arguments.Count; i++)
         {
             var argument = call.Arguments[i];
-            if (argument.Name == null)
+            switch (argument.Kind)
             {
-                if (seenKeyword)
-                {
-                    throw new InvalidOperationException("Positional argument follows keyword argument.");
-                }
+                case CallArgumentKind.Positional:
+                    if (seenKeyword || seenStar)
+                    {
+                        throw new InvalidOperationException(
+                            "Positional argument follows keyword or *args argument.");
+                    }
 
-                args.Add(Evaluate(argument.Value, environment));
-            }
-            else
-            {
-                seenKeyword = true;
-                if (kwargs.ContainsKey(argument.Name))
-                {
-                    throw new InvalidOperationException(
-                        $"Got multiple values for keyword argument '{argument.Name}'.");
-                }
+                    args.Add(Evaluate(argument.Value, environment));
+                    break;
+                case CallArgumentKind.Keyword:
+                    if (seenStarStar)
+                    {
+                        throw new InvalidOperationException(
+                            "Keyword argument follows **kwargs argument.");
+                    }
 
-                kwargs[argument.Name] = Evaluate(argument.Value, environment);
+                    seenKeyword = true;
+                    if (argument.Name == null)
+                    {
+                        throw new InvalidOperationException("Keyword argument missing name.");
+                    }
+
+                    if (kwargs.ContainsKey(argument.Name))
+                    {
+                        throw new InvalidOperationException(
+                            $"Got multiple values for keyword argument '{argument.Name}'.");
+                    }
+
+                    kwargs[argument.Name] = Evaluate(argument.Value, environment);
+                    break;
+                case CallArgumentKind.Star:
+                    if (seenKeyword)
+                    {
+                        throw new InvalidOperationException(
+                            "*args argument follows keyword argument.");
+                    }
+
+                    if (seenStarStar)
+                    {
+                        throw new InvalidOperationException(
+                            "*args argument follows **kwargs argument.");
+                    }
+
+                    seenStar = true;
+                    foreach (var item in EnumerateCallArgs(Evaluate(argument.Value, environment)))
+                    {
+                        args.Add(item);
+                    }
+                    break;
+                case CallArgumentKind.StarStar:
+                    if (seenStarStar)
+                    {
+                        throw new InvalidOperationException(
+                            "Multiple **kwargs arguments are not allowed.");
+                    }
+
+                    seenKeyword = true;
+                    seenStarStar = true;
+                    MergeKwArgs(kwargs, Evaluate(argument.Value, environment));
+                    break;
+                default:
+                    throw new InvalidOperationException("Unsupported call argument.");
             }
         }
 
@@ -795,6 +842,68 @@ public sealed class ExpressionEvaluator
                 number = 0;
                 isInt = false;
                 return false;
+        }
+    }
+
+    private static IEnumerable<StarlarkValue> EnumerateCallArgs(StarlarkValue value)
+    {
+        switch (value)
+        {
+            case StarlarkList list:
+                return list.Items;
+            case StarlarkTuple tuple:
+                return tuple.Items;
+            case StarlarkDict dict:
+                return dict.Entries.Select(entry => entry.Key);
+            case StarlarkRange range:
+                return EnumerateRange(range);
+            default:
+                throw new InvalidOperationException(
+                    $"Object of type '{value.TypeName}' is not iterable.");
+        }
+    }
+
+    private static IEnumerable<StarlarkValue> EnumerateRange(StarlarkRange range)
+    {
+        if (range.Step > 0)
+        {
+            for (var i = range.Start; i < range.Stop; i += range.Step)
+            {
+                yield return new StarlarkInt(i);
+            }
+        }
+        else
+        {
+            for (var i = range.Start; i > range.Stop; i += range.Step)
+            {
+                yield return new StarlarkInt(i);
+            }
+        }
+    }
+
+    private static void MergeKwArgs(
+        IDictionary<string, StarlarkValue> kwargs,
+        StarlarkValue value)
+    {
+        if (value is not StarlarkDict dict)
+        {
+            throw new InvalidOperationException("**kwargs requires a dict.");
+        }
+
+        foreach (var entry in dict.Entries)
+        {
+            if (entry.Key is not StarlarkString key)
+            {
+                throw new InvalidOperationException("**kwargs keys must be strings.");
+            }
+
+            if (kwargs.ContainsKey(key.Value))
+            {
+                throw new InvalidOperationException(
+                    $"Got multiple values for keyword argument '{key.Value}'.");
+            }
+
+            kwargs[key.Value] = entry.Value;
         }
     }
 }

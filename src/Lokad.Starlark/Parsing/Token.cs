@@ -42,6 +42,7 @@ public enum Token
     [Any("+=")] PlusAssign,
     [Any("-=")] MinusAssign,
     [Any("*=")] StarAssign,
+    [Any("**")] StarStar,
     [Any("//=")] FloorDivideAssign,
     [Any("/=")] SlashAssign,
     [Any("%=")] PercentAssign,

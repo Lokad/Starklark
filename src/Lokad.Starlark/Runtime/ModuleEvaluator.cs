@@ -76,11 +76,13 @@ public sealed class ModuleEvaluator
                     lastValue = ExecuteForStatement(forStatement, environment);
                     break;
                 case FunctionDefinitionStatement functionDefinition:
-                    var (names, defaults) = EvaluateDefaults(functionDefinition, environment);
+                    var (names, defaults, varArgsName, kwArgsName) = EvaluateDefaults(functionDefinition, environment);
                     var function = new StarlarkUserFunction(
                         functionDefinition.Name,
                         names,
                         defaults,
+                        varArgsName,
+                        kwArgsName,
                         functionDefinition.Body,
                         environment);
                     environment.Set(functionDefinition.Name, function);
@@ -169,25 +171,47 @@ public sealed class ModuleEvaluator
         }
     }
 
-    private static (IReadOnlyList<string> Names, IReadOnlyList<StarlarkValue?> Defaults) EvaluateDefaults(
+    private static (
+        IReadOnlyList<string> Names,
+        IReadOnlyList<StarlarkValue?> Defaults,
+        string? VarArgsName,
+        string? KwArgsName) EvaluateDefaults(
         FunctionDefinitionStatement definition,
         StarlarkEnvironment environment)
     {
-        var names = new string[definition.Parameters.Count];
-        var defaults = new StarlarkValue?[definition.Parameters.Count];
+        var names = new List<string>(definition.Parameters.Count);
+        var defaults = new List<StarlarkValue?>(definition.Parameters.Count);
         var evaluator = new ExpressionEvaluator();
+        string? varArgsName = null;
+        string? kwArgsName = null;
 
         for (var i = 0; i < definition.Parameters.Count; i++)
         {
             var parameter = definition.Parameters[i];
-            names[i] = parameter.Name;
+            if (parameter.Kind == ParameterKind.VarArgs)
+            {
+                varArgsName = parameter.Name;
+                continue;
+            }
+
+            if (parameter.Kind == ParameterKind.KwArgs)
+            {
+                kwArgsName = parameter.Name;
+                continue;
+            }
+
+            names.Add(parameter.Name);
             if (parameter.Default != null)
             {
-                defaults[i] = evaluator.Evaluate(parameter.Default, environment);
+                defaults.Add(evaluator.Evaluate(parameter.Default, environment));
+            }
+            else
+            {
+                defaults.Add(null);
             }
         }
 
-        return (names, defaults);
+        return (names, defaults, varArgsName, kwArgsName);
     }
 
     private void AssignTarget(AssignmentTarget target, StarlarkValue value, StarlarkEnvironment environment)

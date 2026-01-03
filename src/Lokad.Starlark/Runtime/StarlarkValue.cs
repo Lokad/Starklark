@@ -317,12 +317,16 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         string name,
         IReadOnlyList<string> parameters,
         IReadOnlyList<StarlarkValue?> defaults,
+        string? varArgsName,
+        string? kwArgsName,
         IReadOnlyList<Lokad.Starlark.Syntax.Statement> body,
         StarlarkEnvironment closure)
     {
         Name = name;
         Parameters = parameters;
         Defaults = defaults;
+        VarArgsName = varArgsName;
+        KwArgsName = kwArgsName;
         Body = body;
         Closure = closure;
     }
@@ -330,6 +334,8 @@ public sealed class StarlarkUserFunction : StarlarkCallable
     public string Name { get; }
     public IReadOnlyList<string> Parameters { get; }
     public IReadOnlyList<StarlarkValue?> Defaults { get; }
+    public string? VarArgsName { get; }
+    public string? KwArgsName { get; }
     public IReadOnlyList<Lokad.Starlark.Syntax.Statement> Body { get; }
     public StarlarkEnvironment Closure { get; }
 
@@ -337,12 +343,6 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
-        if (args.Count > Parameters.Count)
-        {
-            throw new InvalidOperationException(
-                $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count}.");
-        }
-
         if (Defaults.Count != Parameters.Count)
         {
             throw new InvalidOperationException(
@@ -350,10 +350,30 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         }
 
         var values = new StarlarkValue?[Parameters.Count];
-        for (var i = 0; i < args.Count; i++)
+        var positionalCount = Math.Min(args.Count, Parameters.Count);
+        for (var i = 0; i < positionalCount; i++)
         {
             values[i] = args[i];
         }
+
+        var varArgsValues = new List<StarlarkValue>();
+        if (args.Count > Parameters.Count)
+        {
+            if (VarArgsName == null)
+            {
+                throw new InvalidOperationException(
+                    $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count}.");
+            }
+
+            for (var i = Parameters.Count; i < args.Count; i++)
+            {
+                varArgsValues.Add(args[i]);
+            }
+        }
+
+        StarlarkDict? kwArgsDict = KwArgsName == null
+            ? null
+            : new StarlarkDict(Array.Empty<KeyValuePair<StarlarkValue, StarlarkValue>>());
 
         if (kwargs.Count > 0)
         {
@@ -370,8 +390,17 @@ public sealed class StarlarkUserFunction : StarlarkCallable
                 }
                 if (index < 0)
                 {
-                    throw new InvalidOperationException(
-                        $"Function '{Name}' got an unexpected keyword argument '{pair.Key}'.");
+                    if (kwArgsDict == null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Function '{Name}' got an unexpected keyword argument '{pair.Key}'.");
+                    }
+
+                    kwArgsDict.Entries.Add(
+                        new KeyValuePair<StarlarkValue, StarlarkValue>(
+                            new StarlarkString(pair.Key),
+                            pair.Value));
+                    continue;
                 }
 
                 if (index < args.Count || values[index] != null)
@@ -402,6 +431,16 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         for (var i = 0; i < Parameters.Count; i++)
         {
             callEnvironment.Set(Parameters[i], values[i]!);
+        }
+
+        if (VarArgsName != null)
+        {
+            callEnvironment.Set(VarArgsName, new StarlarkTuple(varArgsValues));
+        }
+
+        if (KwArgsName != null)
+        {
+            callEnvironment.Set(KwArgsName, kwArgsDict!);
         }
 
         var evaluator = new ModuleEvaluator();

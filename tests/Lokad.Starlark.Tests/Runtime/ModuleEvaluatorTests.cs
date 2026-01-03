@@ -282,6 +282,36 @@ public sealed class ModuleEvaluatorTests
     }
 
     [Fact]
+    public void ExecutesVariadicFunctions()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule(
+            "def f(*args, **kwargs):\n" +
+            "  return (args, kwargs)\n" +
+            "f(1, 2, x=3)\n",
+            environment);
+
+        Assert.Equal(
+            new StarlarkTuple(new StarlarkValue[]
+            {
+                new StarlarkTuple(new StarlarkValue[]
+                {
+                    new StarlarkInt(1),
+                    new StarlarkInt(2)
+                }),
+                new StarlarkDict(new[]
+                {
+                    new KeyValuePair<StarlarkValue, StarlarkValue>(
+                        new StarlarkString("x"),
+                        new StarlarkInt(3))
+                })
+            }),
+            result);
+    }
+
+    [Fact]
     public void ExecutesSortedAndMinMax()
     {
         var interpreter = new StarlarkInterpreter();
