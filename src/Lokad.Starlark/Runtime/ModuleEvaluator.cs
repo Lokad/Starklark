@@ -10,46 +10,37 @@ public sealed class ModuleEvaluator
 
     public StarlarkValue? ExecuteModule(StarlarkModule module, StarlarkEnvironment environment)
     {
-        try
+        var result = ExecuteStatements(module.Statements, environment);
+        switch (result.Kind)
         {
-            return ExecuteStatements(module.Statements, environment);
-        }
-        catch (ReturnSignal)
-        {
-            throw new InvalidOperationException("Return statement is not allowed at module scope.");
-        }
-        catch (BreakSignal)
-        {
-            throw new InvalidOperationException("Break statement is not allowed at module scope.");
-        }
-        catch (ContinueSignal)
-        {
-            throw new InvalidOperationException("Continue statement is not allowed at module scope.");
+            case FlowKind.Return:
+                throw new InvalidOperationException("Return statement is not allowed at module scope.");
+            case FlowKind.Break:
+                throw new InvalidOperationException("Break statement is not allowed at module scope.");
+            case FlowKind.Continue:
+                throw new InvalidOperationException("Continue statement is not allowed at module scope.");
+            default:
+                return result.LastValue;
         }
     }
 
     public StarlarkValue ExecuteFunctionBody(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
     {
-        try
+        var result = ExecuteStatements(statements, environment);
+        switch (result.Kind)
         {
-            ExecuteStatements(statements, environment);
-            return StarlarkNone.Instance;
-        }
-        catch (ReturnSignal signal)
-        {
-            return signal.Value;
-        }
-        catch (BreakSignal)
-        {
-            throw new InvalidOperationException("Break statement is only valid inside loops.");
-        }
-        catch (ContinueSignal)
-        {
-            throw new InvalidOperationException("Continue statement is only valid inside loops.");
+            case FlowKind.Return:
+                return result.Value ?? StarlarkNone.Instance;
+            case FlowKind.Break:
+                throw new InvalidOperationException("Break statement is only valid inside loops.");
+            case FlowKind.Continue:
+                throw new InvalidOperationException("Continue statement is only valid inside loops.");
+            default:
+                return StarlarkNone.Instance;
         }
     }
 
-    private StarlarkValue? ExecuteStatements(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
+    private FlowResult ExecuteStatements(IReadOnlyList<Statement> statements, StarlarkEnvironment environment)
     {
         StarlarkValue? lastValue = null;
 
@@ -70,10 +61,22 @@ public sealed class ModuleEvaluator
                     lastValue = _expressionEvaluator.Evaluate(expressionStatement.Expression, environment);
                     break;
                 case IfStatement ifStatement:
-                    lastValue = ExecuteIfStatement(ifStatement, environment);
+                    var ifResult = ExecuteIfStatement(ifStatement, environment);
+                    if (ifResult.Kind != FlowKind.Normal)
+                    {
+                        return ifResult;
+                    }
+
+                    lastValue = ifResult.LastValue;
                     break;
                 case ForStatement forStatement:
-                    lastValue = ExecuteForStatement(forStatement, environment);
+                    var forResult = ExecuteForStatement(forStatement, environment);
+                    if (forResult.Kind != FlowKind.Normal)
+                    {
+                        return forResult;
+                    }
+
+                    lastValue = forResult.LastValue;
                     break;
                 case FunctionDefinitionStatement functionDefinition:
                     var (names, defaults, varArgsName, kwArgsName) =
@@ -97,11 +100,11 @@ public sealed class ModuleEvaluator
                     var returnValue = returnStatement.Value == null
                         ? StarlarkNone.Instance
                         : _expressionEvaluator.Evaluate(returnStatement.Value, environment);
-                    throw new ReturnSignal(returnValue);
+                    return FlowResult.Return(returnValue);
                 case BreakStatement:
-                    throw new BreakSignal();
+                    return FlowResult.Break();
                 case ContinueStatement:
-                    throw new ContinueSignal();
+                    return FlowResult.Continue();
                 case PassStatement:
                     lastValue = null;
                     break;
@@ -115,10 +118,10 @@ public sealed class ModuleEvaluator
             }
         }
 
-        return lastValue;
+        return FlowResult.Normal(lastValue);
     }
 
-    private StarlarkValue? ExecuteIfStatement(IfStatement ifStatement, StarlarkEnvironment environment)
+    private FlowResult ExecuteIfStatement(IfStatement ifStatement, StarlarkEnvironment environment)
     {
         for (var i = 0; i < ifStatement.Clauses.Count; i++)
         {
@@ -133,28 +136,26 @@ public sealed class ModuleEvaluator
         return ExecuteStatements(ifStatement.ElseStatements, environment);
     }
 
-    private StarlarkValue? ExecuteForStatement(ForStatement forStatement, StarlarkEnvironment environment)
+    private FlowResult ExecuteForStatement(ForStatement forStatement, StarlarkEnvironment environment)
     {
         var iterable = _expressionEvaluator.Evaluate(forStatement.Iterable, environment);
 
         foreach (var item in Enumerate(iterable))
         {
             AssignTarget(forStatement.Target, item, environment);
-            try
+            var bodyResult = ExecuteStatements(forStatement.Body, environment);
+            switch (bodyResult.Kind)
             {
-                ExecuteStatements(forStatement.Body, environment);
-            }
-            catch (ContinueSignal)
-            {
-                continue;
-            }
-            catch (BreakSignal)
-            {
-                break;
+                case FlowKind.Continue:
+                    continue;
+                case FlowKind.Break:
+                    return FlowResult.Normal(null);
+                case FlowKind.Return:
+                    return bodyResult;
             }
         }
 
-        return null;
+        return FlowResult.Normal(null);
     }
 
     private static void ExecuteLoadStatement(LoadStatement loadStatement, StarlarkEnvironment environment)
@@ -1129,18 +1130,37 @@ public sealed class ModuleEvaluator
                     $"Type '{iterable.TypeName}' is not iterable.");
         }
     }
-
-    private sealed class ReturnSignal : Exception
+    private enum FlowKind
     {
-        public ReturnSignal(StarlarkValue value)
-        {
-            Value = value;
-        }
-
-        public StarlarkValue Value { get; }
+        Normal,
+        Return,
+        Break,
+        Continue
     }
 
-    private sealed class BreakSignal : Exception;
+    private readonly struct FlowResult
+    {
+        private FlowResult(FlowKind kind, StarlarkValue? value, StarlarkValue? lastValue)
+        {
+            Kind = kind;
+            Value = value;
+            LastValue = lastValue;
+        }
 
-    private sealed class ContinueSignal : Exception;
+        public FlowKind Kind { get; }
+        public StarlarkValue? Value { get; }
+        public StarlarkValue? LastValue { get; }
+
+        public static FlowResult Normal(StarlarkValue? lastValue) =>
+            new FlowResult(FlowKind.Normal, null, lastValue);
+
+        public static FlowResult Return(StarlarkValue value) =>
+            new FlowResult(FlowKind.Return, value, null);
+
+        public static FlowResult Break() =>
+            new FlowResult(FlowKind.Break, null, null);
+
+        public static FlowResult Continue() =>
+            new FlowResult(FlowKind.Continue, null, null);
+    }
 }
