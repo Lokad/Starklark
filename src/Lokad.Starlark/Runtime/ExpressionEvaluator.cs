@@ -621,6 +621,11 @@ public sealed class ExpressionEvaluator
             return string.Compare(leftString.Value, rightString.Value, StringComparison.Ordinal);
         }
 
+        if (left is StarlarkBool leftBool && right is StarlarkBool rightBool)
+        {
+            return leftBool.Value.CompareTo(rightBool.Value);
+        }
+
         throw new InvalidOperationException(
             $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
     }

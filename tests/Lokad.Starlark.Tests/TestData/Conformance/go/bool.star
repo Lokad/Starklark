@@ -4,6 +4,11 @@ assert_(True)
 assert_(not False)
 assert_eq([bool(False), bool(1), bool(0), bool("hello"), bool("")], [False, True, False, True, False])
 ---
+assert_(False < True)
+assert_(True > False)
+assert_(False <= False)
+assert_(True >= True)
+---
 assert_(None == None)
 assert_(None != False)
 assert_eq(1 == 1, True)
