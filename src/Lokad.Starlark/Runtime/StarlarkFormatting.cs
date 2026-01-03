@@ -84,6 +84,7 @@ public static class StarlarkFormatting
         return value switch
         {
             StarlarkString text => quoteStrings ? Quote(text.Value) : text.Value,
+            StarlarkBytes bytes => quoteStrings ? FormatBytesLiteral(bytes.Bytes) : DecodeBytes(bytes.Bytes),
             StarlarkBool boolean => boolean.Value ? "True" : "False",
             StarlarkNone => "None",
             StarlarkInt integer => integer.Value.ToString(CultureInfo.InvariantCulture),
@@ -92,6 +93,8 @@ public static class StarlarkFormatting
             StarlarkTuple tuple => FormatTuple(tuple, state),
             StarlarkDict dict => FormatDict(dict, state),
             StarlarkRange range => FormatRange(range),
+            StarlarkStringElems elems => $"{Quote(elems.Value)}.elems()",
+            StarlarkBytesElems elems => $"{FormatBytesLiteral(elems.Bytes)}.elems()",
             StarlarkFunction function => function.IsBuiltin
                 ? $"<built-in function {function.Name}>"
                 : $"<function {function.Name}>",
@@ -174,6 +177,64 @@ public static class StarlarkFormatting
         return range.Step == 1
             ? $"range({range.Start}, {range.Stop})"
             : $"range({range.Start}, {range.Stop}, {range.Step})";
+    }
+
+    private static string DecodeBytes(byte[] bytes)
+    {
+        return Encoding.UTF8.GetString(bytes);
+    }
+
+    private static string FormatBytesLiteral(byte[] bytes)
+    {
+        var builder = new StringBuilder(bytes.Length + 3);
+        builder.Append("b\"");
+        foreach (var b in bytes)
+        {
+            switch (b)
+            {
+                case (byte)'\\':
+                    builder.Append("\\\\");
+                    break;
+                case (byte)'"':
+                    builder.Append("\\\"");
+                    break;
+                case (byte)'\n':
+                    builder.Append("\\n");
+                    break;
+                case (byte)'\r':
+                    builder.Append("\\r");
+                    break;
+                case (byte)'\t':
+                    builder.Append("\\t");
+                    break;
+                case (byte)'\a':
+                    builder.Append("\\a");
+                    break;
+                case (byte)'\b':
+                    builder.Append("\\b");
+                    break;
+                case (byte)'\f':
+                    builder.Append("\\f");
+                    break;
+                case (byte)'\v':
+                    builder.Append("\\v");
+                    break;
+                default:
+                    if (b is >= 0x20 and <= 0x7E)
+                    {
+                        builder.Append((char)b);
+                    }
+                    else
+                    {
+                        builder.Append("\\x");
+                        builder.Append(b.ToString("x2", CultureInfo.InvariantCulture));
+                    }
+                    break;
+            }
+        }
+
+        builder.Append('"');
+        return builder.ToString();
     }
 
     private static string Quote(string value)

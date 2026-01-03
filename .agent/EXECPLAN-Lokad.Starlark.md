@@ -25,6 +25,8 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 13:40Z) Aligned numeric equality, hashing, and comparisons for int/float mix.
 - [x] (2026-01-03 14:05Z) Added NaN comparison coverage and recursion guards for equality/`repr`.
 - [x] (2026-01-03 14:20Z) Added java/rust conformance slices and modulo subsets.
+- [x] (2026-01-03 15:05Z) Added bytes literals/builtin plus missing string methods with conformance coverage.
+- [x] (2026-01-03 15:30Z) Corrected raw bytes conformance expectation for `br` literals.
 
 ## Spec Compliance Checklist
 
@@ -35,17 +37,20 @@ Parsing & Syntax:
 - Parse empty tuple literal `()` and disambiguate parenthesized expressions.
 - Allow conditional expressions in all expression positions (including call arguments).
 - Ensure `load` statements and string literal forms match the spec grammar.
+- Add bytes literals (`b"..."`, `br"..."`, `rb"..."`) and triple-quoted strings/bytes. (done)
 
 Core Semantics:
 - Implement boolean ordering comparisons (`False < True`, etc.) per spec ordering rules. (done)
 - Enforce mutation-during-iteration restrictions for list/dict (and comprehensions) where required. (done)
 - Implement recursion detection (dynamic call stack) consistent with Starlark rules. (done)
 - Align hashing, equality, and type ordering to spec (including cross-type comparison restrictions). (done)
+- Implement bytes type semantics (indexing, slicing, equality, hashability, formatting). (done)
 
 Builtins & Methods:
 - Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
 - Complete string/list/dict methods per spec, including argument validation and error messages.
 - Verify `%` formatting and `str.format` behaviors with spec-aligned edge cases.
+- Add `bytes` builtin, `bytes.elems`, and missing string methods (`capitalize`, `elems`, `islower`, `istitle`, `isupper`, `isspace`). (done)
 
 Diagnostics & Error Behavior:
 - Normalize error types/messages to spec expectations where tests rely on them.
@@ -70,6 +75,8 @@ Proceed unattended through the compliance plan without pausing for confirmation 
   Evidence: `MSBUILD : error MSB1009: Project file does not exist. Switch: Lokad.Starlark.slnx`
 - Observation: `dotnet test` accepted the tests project only when given an absolute path.
   Evidence: relative `tests\Lokad.Starlark.Tests\Lokad.Starlark.Tests.csproj` failed with `MSB1009`, absolute path succeeded.
+- Observation: Raw bytes literals (`br"..."`) keep backslashes literal; conformance test data had to reflect that.
+  Evidence: `br"\\n"` yields bytes `[92, 92, 110]` while `br"\n"` yields `[92, 110]`.
 
 ## Decision Log
 
@@ -256,3 +263,4 @@ Plan revisions:
 - Aligned numeric equality, hashing, and comparisons for mixed int/float values.
 - Added NaN comparison coverage and recursion guards for equality/`repr`.
 - Added java list/string slice subsets plus rust int modulo coverage.
+- Added bytes literals/builtin and string method coverage (capitalize, is* variants, elems).

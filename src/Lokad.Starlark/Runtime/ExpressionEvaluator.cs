@@ -39,6 +39,7 @@ public sealed class ExpressionEvaluator
             double d => new StarlarkFloat(d),
             float f => new StarlarkFloat(f),
             string s => new StarlarkString(s),
+            byte[] bytes => new StarlarkBytes(bytes),
             _ => throw new InvalidOperationException(
                 $"Unsupported literal type: {value.GetType().Name}.")
         };
@@ -308,6 +309,7 @@ public sealed class ExpressionEvaluator
             StarlarkList list => IndexList(list, key),
             StarlarkTuple tuple => IndexTuple(tuple, key),
             StarlarkString text => IndexString(text, key),
+            StarlarkBytes bytes => IndexBytes(bytes, key),
             StarlarkDict dict => IndexDict(dict, key),
             _ => throw new InvalidOperationException(
                 $"Indexing not supported for type '{target.TypeName}'.")
@@ -328,6 +330,7 @@ public sealed class ExpressionEvaluator
             StarlarkList list => SliceList(list, start, stop, step),
             StarlarkTuple tuple => SliceTuple(tuple, start, stop, step),
             StarlarkString text => SliceString(text, start, stop, step),
+            StarlarkBytes bytes => SliceBytes(bytes, start, stop, step),
             _ => throw new InvalidOperationException(
                 $"Slicing not supported for type '{target.TypeName}'.")
         };
@@ -428,6 +431,32 @@ public sealed class ExpressionEvaluator
         return new StarlarkString(builder.ToString());
     }
 
+    private static StarlarkValue SliceBytes(
+        StarlarkBytes bytes,
+        StarlarkInt? start,
+        StarlarkInt? stop,
+        StarlarkInt? step)
+    {
+        var (from, to, stride) = NormalizeSlice(bytes.Bytes.Length, start, stop, step);
+        var result = new List<byte>();
+        if (stride > 0)
+        {
+            for (var i = from; i < to; i += stride)
+            {
+                result.Add(bytes.Bytes[i]);
+            }
+        }
+        else
+        {
+            for (var i = from; i > to; i += stride)
+            {
+                result.Add(bytes.Bytes[i]);
+            }
+        }
+
+        return new StarlarkBytes(result.ToArray());
+    }
+
     private static (int Start, int Stop, int Step) NormalizeSlice(
         int length,
         StarlarkInt? start,
@@ -517,6 +546,13 @@ public sealed class ExpressionEvaluator
         return new StarlarkString(text.Value[resolved].ToString());
     }
 
+    private static StarlarkValue IndexBytes(StarlarkBytes bytes, StarlarkValue index)
+    {
+        var position = RequireIndex(index);
+        var resolved = ResolveIndex(position, bytes.Bytes.Length);
+        return new StarlarkInt(bytes.Bytes[resolved]);
+    }
+
     private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
     {
         StarlarkHash.EnsureHashable(key);
@@ -562,6 +598,10 @@ public sealed class ExpressionEvaluator
             StarlarkDict dict => IsInDict(item, dict),
             StarlarkString text when item is StarlarkString needle =>
                 text.Value.Contains(needle.Value, StringComparison.Ordinal),
+            StarlarkBytes bytes when item is StarlarkInt intValue =>
+                IsInBytes(intValue.Value, bytes.Bytes),
+            StarlarkBytes bytes when item is StarlarkBytes needle =>
+                ContainsBytes(bytes.Bytes, needle.Bytes),
             StarlarkRange range when item is StarlarkInt intValue =>
                 IsInRange(intValue.Value, range),
             _ => throw new InvalidOperationException(
@@ -573,6 +613,58 @@ public sealed class ExpressionEvaluator
     {
         StarlarkHash.EnsureHashable(item);
         return dict.Entries.Any(entry => Equals(entry.Key, item));
+    }
+
+    private static bool IsInBytes(long value, byte[] bytes)
+    {
+        if (value is < 0 or > 255)
+        {
+            throw new InvalidOperationException("bytes membership requires an int in the range 0-255.");
+        }
+
+        var needle = (byte)value;
+        for (var i = 0; i < bytes.Length; i++)
+        {
+            if (bytes[i] == needle)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsBytes(byte[] bytes, byte[] needle)
+    {
+        if (needle.Length == 0)
+        {
+            return true;
+        }
+
+        if (needle.Length > bytes.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i <= bytes.Length - needle.Length; i++)
+        {
+            var match = true;
+            for (var j = 0; j < needle.Length; j++)
+            {
+                if (bytes[i + j] != needle[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsInRange(long value, StarlarkRange range)
@@ -651,8 +743,27 @@ public sealed class ExpressionEvaluator
             return leftBool.Value.CompareTo(rightBool.Value);
         }
 
+        if (left is StarlarkBytes leftBytes && right is StarlarkBytes rightBytes)
+        {
+            return CompareBytes(leftBytes.Bytes, rightBytes.Bytes);
+        }
+
         throw new InvalidOperationException(
             $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static int CompareBytes(byte[] left, byte[] right)
+    {
+        var length = left.Length < right.Length ? left.Length : right.Length;
+        for (var i = 0; i < length; i++)
+        {
+            if (left[i] != right[i])
+            {
+                return left[i].CompareTo(right[i]);
+            }
+        }
+
+        return left.Length.CompareTo(right.Length);
     }
 
     private static bool CompareNumbers(StarlarkValue left, StarlarkValue right, RelationalOperator op)
@@ -735,6 +846,14 @@ public sealed class ExpressionEvaluator
             return new StarlarkString(leftString.Value + rightString.Value);
         }
 
+        if (left is StarlarkBytes leftBytes && right is StarlarkBytes rightBytes)
+        {
+            var combined = new byte[leftBytes.Bytes.Length + rightBytes.Bytes.Length];
+            leftBytes.Bytes.CopyTo(combined, 0);
+            rightBytes.Bytes.CopyTo(combined, leftBytes.Bytes.Length);
+            return new StarlarkBytes(combined);
+        }
+
         if (left is StarlarkList leftList && right is StarlarkList rightList)
         {
             var items = new List<StarlarkValue>(leftList.Items.Count + rightList.Items.Count);
@@ -801,6 +920,16 @@ public sealed class ExpressionEvaluator
             return new StarlarkString(RepeatString(rightString.Value, leftCount.Value));
         }
 
+        if (left is StarlarkBytes leftBytes && right is StarlarkInt rightCountBytes)
+        {
+            return new StarlarkBytes(RepeatBytes(leftBytes.Bytes, rightCountBytes.Value));
+        }
+
+        if (left is StarlarkInt leftCountBytes && right is StarlarkBytes rightBytes)
+        {
+            return new StarlarkBytes(RepeatBytes(rightBytes.Bytes, leftCountBytes.Value));
+        }
+
         if (left is StarlarkList leftList && right is StarlarkInt listCount)
         {
             return new StarlarkList(RepeatList(leftList.Items, listCount.Value));
@@ -852,6 +981,28 @@ public sealed class ExpressionEvaluator
         }
 
         return builder.ToString();
+    }
+
+    private static byte[] RepeatBytes(byte[] value, long count)
+    {
+        if (count <= 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        if (count > int.MaxValue)
+        {
+            throw new InvalidOperationException("Repeat count is too large.");
+        }
+
+        var total = value.Length * (int)count;
+        var result = new byte[total];
+        for (var i = 0; i < count; i++)
+        {
+            value.CopyTo(result, i * value.Length);
+        }
+
+        return result;
     }
 
     private static List<StarlarkValue> RepeatList(IReadOnlyList<StarlarkValue> items, long count)
@@ -1045,6 +1196,10 @@ public sealed class ExpressionEvaluator
                 return tuple.Items;
             case StarlarkDict dict:
                 return dict.EnumerateWithMutationCheck();
+            case StarlarkStringElems elems:
+                return elems.Enumerate();
+            case StarlarkBytesElems elems:
+                return elems.Enumerate();
             case StarlarkRange range:
                 return EnumerateRange(range);
             default:
@@ -1176,6 +1331,10 @@ public sealed class ExpressionEvaluator
                 return dict.Entries.Select(entry => entry.Key);
             case StarlarkRange range:
                 return EnumerateRange(range);
+            case StarlarkStringElems elems:
+                return elems.Enumerate();
+            case StarlarkBytesElems elems:
+                return elems.Enumerate();
             default:
                 throw new InvalidOperationException(
                     $"Object of type '{value.TypeName}' is not iterable.");

@@ -44,6 +44,11 @@ internal static class StarlarkEquality
             return leftString.Equals(rightString);
         }
 
+        if (left is StarlarkBytes leftBytes && right is StarlarkBytes rightBytes)
+        {
+            return leftBytes.Equals(rightBytes);
+        }
+
         if (left is StarlarkBool leftBool && right is StarlarkBool rightBool)
         {
             return leftBool.Equals(rightBool);

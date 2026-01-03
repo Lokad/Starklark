@@ -251,7 +251,13 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
 
     private static string ParseStringLiteral(string value)
     {
-        return StringLiteralParser.Parse(value);
+        var parsed = StringLiteralParser.Parse(value);
+        if (parsed is string text)
+        {
+            return text;
+        }
+
+        throw new InvalidOperationException("Expected string literal.");
     }
 
     [Rule]

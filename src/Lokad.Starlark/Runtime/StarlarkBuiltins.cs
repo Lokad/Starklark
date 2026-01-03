@@ -19,6 +19,7 @@ public static class StarlarkBuiltins
         environment.AddFunction("str", Str, isBuiltin: true);
         environment.AddFunction("int", Int, isBuiltin: true);
         environment.AddFunction("float", Float, isBuiltin: true);
+        environment.AddFunction("bytes", Bytes, isBuiltin: true);
         environment.AddFunction("type", Type, isBuiltin: true);
         environment.AddFunction("repr", Repr, isBuiltin: true);
         environment.AddFunction("sorted", Sorted, isBuiltin: true);
@@ -43,6 +44,7 @@ public static class StarlarkBuiltins
         return args[0] switch
         {
             StarlarkString text => new StarlarkInt(text.Value.Length),
+            StarlarkBytes bytes => new StarlarkInt(bytes.Bytes.Length),
             StarlarkList list => new StarlarkInt(list.Items.Count),
             StarlarkTuple tuple => new StarlarkInt(tuple.Items.Count),
             StarlarkDict dict => new StarlarkInt(dict.Entries.Count),
@@ -315,6 +317,51 @@ public static class StarlarkBuiltins
                 out var parsed) => new StarlarkFloat(parsed),
             _ => throw new InvalidOperationException($"Expected float-compatible value, got '{value.TypeName}'.")
         };
+    }
+
+    private static StarlarkValue Bytes(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1);
+        var value = args[0];
+        switch (value)
+        {
+            case StarlarkBytes bytes:
+                return bytes;
+            case StarlarkString text:
+                return new StarlarkBytes(System.Text.Encoding.UTF8.GetBytes(text.Value));
+            default:
+                IEnumerable<StarlarkValue> items;
+                try
+                {
+                    items = Enumerate(value);
+                }
+                catch (InvalidOperationException)
+                {
+                    throw new InvalidOperationException(
+                        "bytes expects a string, bytes, or iterable of int.");
+                }
+
+                var result = new List<byte>();
+                foreach (var item in items)
+                {
+                    if (item is not StarlarkInt intValue)
+                    {
+                        throw new InvalidOperationException("bytes expects integers in the range 0-255.");
+                    }
+
+                    if (intValue.Value is < 0 or > 255)
+                    {
+                        throw new InvalidOperationException("bytes expects integers in the range 0-255.");
+                    }
+
+                    result.Add((byte)intValue.Value);
+                }
+
+                return new StarlarkBytes(result.ToArray());
+        }
     }
 
     private static StarlarkValue Type(
@@ -662,15 +709,44 @@ public static class StarlarkBuiltins
 
     private static int CompareValues(StarlarkValue left, StarlarkValue right)
     {
-        if (TryGetNumber(left, out var leftNumber, out _)
-            && TryGetNumber(right, out var rightNumber, out _))
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
         {
-            return leftNumber.CompareTo(rightNumber);
+            return leftInt.Value.CompareTo(rightInt.Value);
+        }
+
+        if (left is StarlarkFloat leftFloat && right is StarlarkFloat rightFloat)
+        {
+            if (double.IsNaN(leftFloat.Value) || double.IsNaN(rightFloat.Value))
+            {
+                throw new InvalidOperationException("Comparison with NaN is not supported.");
+            }
+
+            return leftFloat.Value.CompareTo(rightFloat.Value);
+        }
+
+        if (left is StarlarkInt leftNumber && right is StarlarkFloat rightNumber)
+        {
+            return StarlarkNumber.CompareIntFloat(leftNumber.Value, rightNumber.Value);
+        }
+
+        if (left is StarlarkFloat leftFloatNumber && right is StarlarkInt rightIntNumber)
+        {
+            return StarlarkNumber.CompareFloatInt(leftFloatNumber.Value, rightIntNumber.Value);
         }
 
         if (left is StarlarkString leftString && right is StarlarkString rightString)
         {
             return string.Compare(leftString.Value, rightString.Value, StringComparison.Ordinal);
+        }
+
+        if (left is StarlarkBytes leftBytes && right is StarlarkBytes rightBytes)
+        {
+            return CompareBytes(leftBytes.Bytes, rightBytes.Bytes);
+        }
+
+        if (left is StarlarkBool leftBool && right is StarlarkBool rightBool)
+        {
+            return leftBool.Value.CompareTo(rightBool.Value);
         }
 
         throw new InvalidOperationException(
@@ -702,10 +778,16 @@ public static class StarlarkBuiltins
         {
             StarlarkString => new List<string>
             {
+                "capitalize",
                 "count",
+                "elems",
                 "endswith",
                 "find",
                 "format",
+                "islower",
+                "isspace",
+                "istitle",
+                "isupper",
                 "join",
                 "lower",
                 "partition",
@@ -722,6 +804,7 @@ public static class StarlarkBuiltins
                 "lstrip",
                 "rstrip"
             },
+            StarlarkBytes => new List<string> { "elems" },
             StarlarkList => new List<string>
             {
                 "append",
@@ -794,9 +877,27 @@ public static class StarlarkBuiltins
                 return EnumerateDictKeys(dict);
             case StarlarkRange range:
                 return EnumerateRange(range);
+            case StarlarkStringElems elems:
+                return elems.Enumerate();
+            case StarlarkBytesElems elems:
+                return elems.Enumerate();
             default:
                 throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.");
         }
+    }
+
+    private static int CompareBytes(byte[] left, byte[] right)
+    {
+        var length = left.Length < right.Length ? left.Length : right.Length;
+        for (var i = 0; i < length; i++)
+        {
+            if (left[i] != right[i])
+            {
+                return left[i].CompareTo(right[i]);
+            }
+        }
+
+        return left.Length.CompareTo(right.Length);
     }
 
     private static IEnumerable<StarlarkValue> EnumerateDictKeys(StarlarkDict dict)

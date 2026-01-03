@@ -13,6 +13,7 @@ public static class StarlarkMethods
         return target switch
         {
             StarlarkString text => BindString(text, name),
+            StarlarkBytes bytes => BindBytes(bytes, name),
             StarlarkList list => BindList(list, name),
             StarlarkDict dict => BindDict(dict, name),
             _ => throw new InvalidOperationException(
@@ -42,7 +43,23 @@ public static class StarlarkMethods
             "lower" => new StarlarkBoundMethod(name, target, StringLower),
             "upper" => new StarlarkBoundMethod(name, target, StringUpper),
             "title" => new StarlarkBoundMethod(name, target, StringTitle),
+            "capitalize" => new StarlarkBoundMethod(name, target, StringCapitalize),
+            "islower" => new StarlarkBoundMethod(name, target, StringIsLower),
+            "isupper" => new StarlarkBoundMethod(name, target, StringIsUpper),
+            "istitle" => new StarlarkBoundMethod(name, target, StringIsTitle),
+            "isspace" => new StarlarkBoundMethod(name, target, StringIsSpace),
+            "elems" => new StarlarkBoundMethod(name, target, StringElems),
             "format" => new StarlarkBoundMethod(name, target, StringFormat),
+            _ => throw new InvalidOperationException(
+                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+        };
+    }
+
+    private static StarlarkValue BindBytes(StarlarkBytes target, string name)
+    {
+        return name switch
+        {
+            "elems" => new StarlarkBoundMethod(name, target, BytesElems),
             _ => throw new InvalidOperationException(
                 $"Object of type '{target.TypeName}' has no attribute '{name}'.")
         };
@@ -299,19 +316,7 @@ public static class StarlarkMethods
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 1, "join");
         var separator = ((StarlarkString)target).Value;
-        IReadOnlyList<StarlarkValue> items;
-        if (args[0] is StarlarkList list)
-        {
-            items = list.Items;
-        }
-        else if (args[0] is StarlarkTuple tuple)
-        {
-            items = tuple.Items;
-        }
-        else
-        {
-            throw new InvalidOperationException("join expects a list or tuple of strings.");
-        }
+        var items = EnumerateIterable(args[0]).ToList();
         var parts = new string[items.Count];
         for (var i = 0; i < items.Count; i++)
         {
@@ -345,6 +350,151 @@ public static class StarlarkMethods
         var text = ((StarlarkString)target).Value;
         return new StarlarkString(text.ToUpperInvariant());
     }
+    private static StarlarkValue StringCapitalize(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "capitalize");
+        var text = ((StarlarkString)target).Value;
+        if (text.Length == 0)
+        {
+            return new StarlarkString(text);
+        }
+
+        var span = text.AsSpan();
+        var status = System.Text.Rune.DecodeFromUtf16(span, out var rune, out var consumed);
+        if (status != System.Buffers.OperationStatus.Done)
+        {
+            rune = System.Text.Rune.ReplacementChar;
+            consumed = 1;
+        }
+
+        var first = text.Substring(0, consumed).ToUpperInvariant();
+        var rest = text.Substring(consumed).ToLowerInvariant();
+        return new StarlarkString(first + rest);
+    }
+    private static StarlarkValue StringIsLower(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "islower");
+        var text = ((StarlarkString)target).Value;
+        var hasCased = false;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (IsCased(rune))
+            {
+                hasCased = true;
+                if (!System.Text.Rune.IsLower(rune))
+                {
+                    return new StarlarkBool(false);
+                }
+            }
+        }
+
+        return new StarlarkBool(hasCased);
+    }
+    private static StarlarkValue StringIsUpper(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "isupper");
+        var text = ((StarlarkString)target).Value;
+        var hasCased = false;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (IsCased(rune))
+            {
+                hasCased = true;
+                if (!System.Text.Rune.IsUpper(rune) && !IsTitleCase(rune))
+                {
+                    return new StarlarkBool(false);
+                }
+            }
+        }
+
+        return new StarlarkBool(hasCased);
+    }
+    private static StarlarkValue StringIsTitle(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "istitle");
+        var text = ((StarlarkString)target).Value;
+        var hasCased = false;
+        var expectsTitle = true;
+
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (IsCased(rune))
+            {
+                hasCased = true;
+                if (expectsTitle)
+                {
+                    if (!IsTitleCase(rune))
+                    {
+                        return new StarlarkBool(false);
+                    }
+
+                    expectsTitle = false;
+                }
+                else
+                {
+                    if (!System.Text.Rune.IsLower(rune))
+                    {
+                        return new StarlarkBool(false);
+                    }
+                }
+            }
+            else
+            {
+                expectsTitle = true;
+            }
+        }
+
+        return new StarlarkBool(hasCased);
+    }
+    private static StarlarkValue StringIsSpace(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "isspace");
+        var text = ((StarlarkString)target).Value;
+        if (text.Length == 0)
+        {
+            return new StarlarkBool(false);
+        }
+
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (!System.Text.Rune.IsWhiteSpace(rune))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
+    }
+    private static StarlarkValue StringElems(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "elems");
+        var text = ((StarlarkString)target).Value;
+        return new StarlarkStringElems(text);
+    }
     private static StarlarkValue StringTitle(
         StarlarkValue target,
         IReadOnlyList<StarlarkValue> args,
@@ -355,16 +505,17 @@ public static class StarlarkMethods
         var text = ((StarlarkString)target).Value;
         var builder = new StringBuilder(text.Length);
         var startOfWord = true;
-        foreach (var ch in text)
+        foreach (var rune in text.EnumerateRunes())
         {
-            if (char.IsLetter(ch))
+            if (System.Text.Rune.IsLetter(rune))
             {
-                builder.Append(startOfWord ? char.ToUpperInvariant(ch) : char.ToLowerInvariant(ch));
+                var segment = rune.ToString();
+                builder.Append(startOfWord ? segment.ToUpperInvariant() : segment.ToLowerInvariant());
                 startOfWord = false;
             }
             else
             {
-                builder.Append(ch);
+                builder.Append(rune.ToString());
                 startOfWord = true;
             }
         }
@@ -378,6 +529,16 @@ public static class StarlarkMethods
     {
         var text = ((StarlarkString)target).Value;
         return new StarlarkString(FormatBraces(text, args, kwargs));
+    }
+    private static StarlarkValue BytesElems(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "elems");
+        var bytes = ((StarlarkBytes)target).Bytes;
+        return new StarlarkBytesElems(bytes);
     }
 
     private static StarlarkValue ListAppend(
@@ -1038,6 +1199,10 @@ public static class StarlarkMethods
                 return dict.Entries.Select(entry => entry.Key);
             case StarlarkRange range:
                 return EnumerateRange(range);
+            case StarlarkStringElems elems:
+                return elems.Enumerate();
+            case StarlarkBytesElems elems:
+                return elems.Enumerate();
             default:
                 throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.");
         }
@@ -1059,6 +1224,24 @@ public static class StarlarkMethods
                 yield return new StarlarkInt(i);
             }
         }
+    }
+
+    private static bool IsCased(System.Text.Rune rune)
+    {
+        if (System.Text.Rune.IsUpper(rune) || System.Text.Rune.IsLower(rune))
+        {
+            return true;
+        }
+
+        return System.Globalization.UnicodeCategory.TitlecaseLetter ==
+               System.Text.Rune.GetUnicodeCategory(rune);
+    }
+
+    private static bool IsTitleCase(System.Text.Rune rune)
+    {
+        return System.Text.Rune.IsUpper(rune) ||
+               System.Globalization.UnicodeCategory.TitlecaseLetter ==
+               System.Text.Rune.GetUnicodeCategory(rune);
     }
 
     private static bool TryGetPair(StarlarkValue item, out StarlarkValue key, out StarlarkValue value)

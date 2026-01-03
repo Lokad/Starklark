@@ -18,3 +18,16 @@ assert_("foo".endswith("oo"))
 ---
 assert_eq(",".join(["a", "b", "c"]), "a,b,c")
 assert_eq("a.b.c".split("."), ["a", "b", "c"])
+---
+assert_eq("hello, world!".capitalize(), "Hello, world!")
+assert_("hello, world".islower())
+assert_(not "Catch-22".islower())
+assert_("HAL-9000".isupper())
+assert_(not "Catch-22".isupper())
+assert_("Hello, World!".istitle())
+assert_(not "HAL-9000".istitle())
+assert_(" \t\r\n".isspace())
+assert_(not "".isspace())
+---
+assert_eq("a".join("ctmrn".elems()), "catamaran")
+assert_eq(list("abc".elems()), ["a", "b", "c"])

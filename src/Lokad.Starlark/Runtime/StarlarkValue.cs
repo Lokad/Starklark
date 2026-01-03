@@ -113,6 +113,50 @@ public sealed class StarlarkString : StarlarkValue, IEquatable<StarlarkString>
     public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
 }
 
+public sealed class StarlarkBytes : StarlarkValue, IEquatable<StarlarkBytes>
+{
+    public StarlarkBytes(byte[] bytes)
+    {
+        Bytes = bytes;
+    }
+
+    public byte[] Bytes { get; }
+
+    public override string TypeName => "bytes";
+    public override bool IsTruthy => Bytes.Length != 0;
+
+    public bool Equals(StarlarkBytes? other)
+    {
+        if (other == null || other.Bytes.Length != Bytes.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < Bytes.Length; i++)
+        {
+            if (Bytes[i] != other.Bytes[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public override bool Equals(object? obj) => obj is StarlarkBytes other && Equals(other);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        for (var i = 0; i < Bytes.Length; i++)
+        {
+            hash.Add(Bytes[i]);
+        }
+
+        return hash.ToHashCode();
+    }
+}
+
 public sealed class StarlarkList : StarlarkValue
 {
     public StarlarkList(IEnumerable<StarlarkValue> items)

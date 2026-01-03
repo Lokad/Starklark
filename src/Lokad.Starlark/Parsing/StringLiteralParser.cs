@@ -2,7 +2,7 @@ namespace Lokad.Starlark.Parsing;
 
 internal static class StringLiteralParser
 {
-    public static string Parse(string token)
+    public static object Parse(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
@@ -10,9 +10,25 @@ internal static class StringLiteralParser
         }
 
         var offset = 0;
-        if (token.Length >= 2 && (token[0] == 'r' || token[0] == 'R'))
+        var isRaw = false;
+        var isBytes = false;
+        while (offset < token.Length && offset < 2)
         {
-            offset = 1;
+            var prefix = token[offset];
+            if (prefix is 'r' or 'R')
+            {
+                isRaw = true;
+            }
+            else if (prefix is 'b' or 'B')
+            {
+                isBytes = true;
+            }
+            else
+            {
+                break;
+            }
+
+            offset++;
         }
 
         if (token.Length - offset < 2)
@@ -20,13 +36,30 @@ internal static class StringLiteralParser
             return string.Empty;
         }
 
-        var quote = token[offset];
-        if (quote != '"' && quote != '\'')
+        var quoteLength = 1;
+        if (token.Length - offset >= 6)
+        {
+            var quoteCandidate = token.Substring(offset, 3);
+            if (quoteCandidate == "\"\"\"" || quoteCandidate == "'''")
+            {
+                quoteLength = 3;
+            }
+        }
+
+        var quote = token.Substring(offset, quoteLength);
+        if (quote is not ("\"" or "'" or "\"\"\"" or "'''"))
         {
             return string.Empty;
         }
 
-        var text = token.Substring(offset + 1, token.Length - offset - 2);
-        return offset == 1 ? text : StringEscapes.Unescape(text);
+        var text = token.Substring(offset + quoteLength, token.Length - offset - (quoteLength * 2));
+        if (isBytes)
+        {
+            return isRaw
+                ? System.Text.Encoding.UTF8.GetBytes(text)
+                : BytesEscapes.Unescape(text);
+        }
+
+        return isRaw ? text : StringEscapes.Unescape(text);
     }
 }

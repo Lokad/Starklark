@@ -777,6 +777,18 @@ public sealed class ModuleEvaluator
                     yield return key;
                 }
                 yield break;
+            case StarlarkStringElems elems:
+                foreach (var item in elems.Enumerate())
+                {
+                    yield return item;
+                }
+                yield break;
+            case StarlarkBytesElems elems:
+                foreach (var item in elems.Enumerate())
+                {
+                    yield return item;
+                }
+                yield break;
             case StarlarkRange range:
                 if (range.Step > 0)
                 {
