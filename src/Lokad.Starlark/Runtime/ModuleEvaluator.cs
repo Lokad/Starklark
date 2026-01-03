@@ -240,9 +240,17 @@ public sealed class ModuleEvaluator
         AugmentedAssignmentStatement assignment,
         StarlarkEnvironment environment)
     {
-        if (!environment.TryGet(target.Name, out var existing))
+        var lookup = environment.TryGetDetailed(target.Name, out var existing);
+        if (lookup == LookupResult.ReferencedBeforeAssignment)
         {
-            RuntimeErrors.Throw($"Undefined identifier '{target.Name}'.", target.Span);
+            RuntimeErrors.Throw(
+                $"local variable '{target.Name}' referenced before assignment.",
+                target.Span);
+        }
+
+        if (lookup == LookupResult.NotFound)
+        {
+            RuntimeErrors.Throw($"undefined identifier '{target.Name}'.", target.Span);
         }
 
         var right = _expressionEvaluator.Evaluate(assignment.Value, environment);

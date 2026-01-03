@@ -12,6 +12,7 @@ public static class ConformanceTestEnvironment
         environment.AddFunction("assert_", AssertTrue);
         environment.AddFunction("assert_eq", AssertEqual);
         environment.AddFunction("assert_ne", AssertNotEqual);
+        environment.AddFunction("print", Print);
         return environment;
     }
 
@@ -56,6 +57,13 @@ public static class ConformanceTestEnvironment
                 $"assert_ne failed: {StarlarkFormatting.ToString(args[0])} == {StarlarkFormatting.ToString(args[1])}.");
         }
 
+        return StarlarkNone.Instance;
+    }
+
+    private static StarlarkValue Print(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
         return StarlarkNone.Instance;
     }
 

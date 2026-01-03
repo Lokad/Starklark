@@ -102,22 +102,34 @@ public sealed class StarlarkEnvironment
 
     public bool TryGet(string name, out StarlarkValue value)
     {
+        return TryGetDetailed(name, out value) == LookupResult.Found;
+    }
+
+    internal LookupResult TryGetDetailed(string name, out StarlarkValue value)
+    {
         for (var scope = this; scope != null; scope = scope.Parent)
         {
             if (scope._locals.TryGetValue(name, out var found))
             {
                 value = found ?? StarlarkNone.Instance;
-                return true;
+                return LookupResult.Found;
             }
 
             if (scope._declaredLocals != null && scope._declaredLocals.Contains(name))
             {
-                throw new InvalidOperationException(
-                    $"local variable '{name}' referenced before assignment.");
+                value = StarlarkNone.Instance;
+                return LookupResult.ReferencedBeforeAssignment;
             }
         }
 
         value = StarlarkNone.Instance;
-        return false;
+        return LookupResult.NotFound;
     }
+}
+
+internal enum LookupResult
+{
+    Found,
+    NotFound,
+    ReferencedBeforeAssignment
 }

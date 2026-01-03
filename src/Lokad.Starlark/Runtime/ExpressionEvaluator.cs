@@ -50,9 +50,17 @@ public sealed class ExpressionEvaluator
 
     private static StarlarkValue ResolveIdentifier(IdentifierExpression identifier, StarlarkEnvironment environment)
     {
-        if (!environment.TryGet(identifier.Name, out var value))
+        var lookup = environment.TryGetDetailed(identifier.Name, out var value);
+        if (lookup == LookupResult.ReferencedBeforeAssignment)
         {
-            RuntimeErrors.Throw($"Undefined identifier '{identifier.Name}'.", identifier.Span);
+            RuntimeErrors.Throw(
+                $"local variable '{identifier.Name}' referenced before assignment.",
+                identifier.Span);
+        }
+
+        if (lookup == LookupResult.NotFound)
+        {
+            RuntimeErrors.Throw($"undefined identifier '{identifier.Name}'.", identifier.Span);
         }
 
         return value;
