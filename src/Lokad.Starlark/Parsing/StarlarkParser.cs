@@ -11,7 +11,7 @@ public sealed class StarlarkParser : StarlarkGrammar<StarlarkParser, ExpressionR
     public static Expression ParseExpression(string source)
     {
         var parser = new StarlarkParser();
-        var tokens = parser.Tokens = MakeTokenReader().ReadAllTokens(source);
+        var tokens = MakeTokenReader().ReadAllTokens(source);
 
         if (tokens.HasInvalidTokens)
         {
@@ -22,6 +22,9 @@ public sealed class StarlarkParser : StarlarkGrammar<StarlarkParser, ExpressionR
                 $"Invalid character: '{source[t.Start]}'.",
                 new SourceSpan(location, t.Length));
         }
+
+        tokens = TokenFiltering.DropLineTokensInsideBrackets(tokens);
+        parser.Tokens = tokens;
 
         try
         {

@@ -12,7 +12,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     public static StarlarkModule ParseModule(string source)
     {
         var parser = new StarlarkModuleParser();
-        var tokens = parser.Tokens = MakeTokenReader().ReadAllTokens(source);
+        var tokens = MakeTokenReader().ReadAllTokens(source);
 
         if (tokens.HasInvalidTokens)
         {
@@ -23,6 +23,9 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
                 $"Invalid character: '{source[t.Start]}'.",
                 new SourceSpan(location, t.Length));
         }
+
+        tokens = TokenFiltering.DropLineTokensInsideBrackets(tokens);
+        parser.Tokens = tokens;
 
         try
         {
@@ -46,19 +49,27 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     [Rule]
     public StatementLine BlankLine([T(Token.EoL)] Token eol)
     {
-        return new StatementLine(null);
+        return new StatementLine(Array.Empty<Statement>());
     }
 
     [Rule]
-    public StatementLine SimpleStatementLine([NT] SimpleStatement statement, [T(Token.EoL)] Token eol)
+    public StatementLine SimpleStatementLine([NT] StatementSequence sequence, [T(Token.EoL)] Token eol)
     {
-        return new StatementLine(statement.Statement);
+        return new StatementLine(sequence.Statements);
     }
 
     [Rule]
     public StatementLine CompoundStatementLine([NT] CompoundStatement statement, [O(Token.EoL)] Token? eol)
     {
-        return new StatementLine(statement.Statement);
+        return new StatementLine(new[] { statement.Statement });
+    }
+
+    [Rule]
+    public StatementSequence SimpleStatementSequence(
+        [L(Sep = Token.Semicolon, Min = 1)] SimpleStatement[] statements,
+        [O(Token.Semicolon)] Token? trailing)
+    {
+        return new StatementSequence(statements.Select(statement => statement.Statement).ToArray());
     }
 
     [Rule]
@@ -141,6 +152,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         [T(Token.String)] Pos<string> module,
         [T(Token.Comma)] Pos<string> comma,
         [L(Sep = Token.Comma, Min = 1)] LoadBinding[] bindings,
+        [O(Token.TrailingComma)] Token? trailing,
         [T(Token.CloseParen)] Pos<string> closeParen)
     {
         return new SimpleStatement(
@@ -215,6 +227,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         [T(Token.Id)] Pos<string> name,
         [T(Token.OpenParen)] Pos<string> openParen,
         [L(Sep = Token.Comma)] FunctionParameter[] parameters,
+        [O(Token.TrailingComma)] Token? trailing,
         [T(Token.CloseParen)] Pos<string> closeParen,
         [T(Token.Colon)] Pos<string> colon,
         [NT] Suite suite)
@@ -256,9 +269,9 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     }
 
     [Rule]
-    public Suite SingleLineSuite([NT] SimpleStatement statement)
+    public Suite SingleLineSuite([NT] StatementSequence sequence)
     {
-        return new Suite(new[] { statement.Statement });
+        return new Suite(sequence.Statements);
     }
 
     [Rule]
@@ -274,9 +287,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     private static Statement[] CollectStatements(StatementLine[] lines)
     {
         return lines
-            .Select(line => line.Statement)
-            .Where(statement => statement != null)
-            .Select(statement => statement!)
+            .SelectMany(line => line.Statements)
             .ToArray();
     }
 
@@ -284,7 +295,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
 
 public readonly record struct ModuleRoot(StarlarkModule Module);
 
-public readonly record struct StatementLine(Statement? Statement);
+public readonly record struct StatementLine(IReadOnlyList<Statement> Statements);
 
 public readonly record struct Suite(IReadOnlyList<Statement> Statements);
 
@@ -295,3 +306,5 @@ public readonly record struct ElseClause(IReadOnlyList<Statement> Statements);
 public readonly record struct SimpleStatement(Statement Statement);
 
 public readonly record struct CompoundStatement(Statement Statement);
+
+public readonly record struct StatementSequence(IReadOnlyList<Statement> Statements);

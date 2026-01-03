@@ -49,6 +49,8 @@ public sealed class TokenNamer : ITokenNamer<Token>
             Token.OpenBrace => "'{'",
             Token.CloseBrace => "'}'",
             Token.Comma => "','",
+            Token.TrailingComma => "','",
+            Token.Semicolon => "';'",
             Token.Colon => "':'",
             Token.Dot => "'.'",
             _ => token.ToString()

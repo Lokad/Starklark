@@ -73,6 +73,8 @@ public enum Token
     [Any("{")] OpenBrace,
     [Any("}")] CloseBrace,
     [Any(",")] Comma,
+    TrailingComma,
+    [Any(";")] Semicolon,
     [Any(":")] Colon,
     [Any(".")] Dot,
 

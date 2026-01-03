@@ -12,6 +12,7 @@ The goal is to bring the hermetic Lokad.Starlark interpreter to full Starlark co
 
 - [x] (2026-01-03 22:30Z) Collected a preliminary gap inventory by running the upstream conformance suite locally and noting failure categories.
 - [x] (2026-01-03 22:36Z) Mirrored upstream testdata into a local `_fullsuite` folder and captured the baseline counts for the net10.0 run.
+- [ ] (2026-01-03 23:50Z) Parser now handles semicolons and trailing commas inside brackets via a `TrailingComma` token; single-item tuples parse again.
 - [ ] Close parser and syntax gaps that block spec tests (semicolons, trailing commas, slice parsing, call parsing).
 - [ ] Close runtime semantics gaps (scope rules, mutation detection, comparison and containment rules).
 - [ ] Close builtin behavior gaps (int parsing, sorted/min/max/reversed/range, string helpers).
@@ -29,6 +30,8 @@ The goal is to bring the hermetic Lokad.Starlark interpreter to full Starlark co
   Evidence: `java/int_constructor.star` and `java/sorted.star` cases expect specific error text and type rules that are not currently met.
 - Observation: The net10.0 baseline for the full-suite mirror is 395 passing and 175 failing tests.
   Evidence: `dotnet test Lokad.Starlark.slnx --framework net10.0 --no-build` reports "Failed: 175, Passed: 395, Total: 570".
+- Observation: After parser updates for semicolons and trailing commas, the net10.0 run now reports 401 passing and 169 failing tests.
+  Evidence: `dotnet test tests\\Lokad.Starlark.Tests\\Lokad.Starlark.Tests.csproj --framework net10.0 --no-build` reports "Failed: 169, Passed: 401, Total: 570".
 
 ## Decision Log
 
@@ -131,3 +134,4 @@ If new helpers are needed to centralize error messages, define them in `RuntimeE
 Note on updates: when this plan changes, add a note at the bottom describing what changed and why.
 
 Plan update (2026-01-03): Marked the full-suite mirror/baseline milestone as complete and recorded the net10.0 pass/fail counts so future deltas are measurable.
+Plan update (2026-01-03): Added parser progress on trailing commas/semicolons and refreshed the net10.0 pass/fail counts after the grammar changes.
