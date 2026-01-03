@@ -11,15 +11,15 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1 + 2 * 3");
 
-        var expected = new BinaryExpression(
-            new LiteralExpression(1L),
+        var expected = Bin(
+            Lit(1L),
             BinaryOperator.Add,
-            new BinaryExpression(
-                new LiteralExpression(2L),
+            Bin(
+                Lit(2L),
                 BinaryOperator.Multiply,
-                new LiteralExpression(3L)));
+                Lit(3L)));
 
-        Assert.Equal(expected, expr);
+        Assert.Equal(SyntaxNormalization.Normalize(expected), SyntaxNormalization.Normalize(expr));
     }
 
     [Fact]
@@ -27,12 +27,12 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1 + 2\n");
 
-        var expected = new BinaryExpression(
-            new LiteralExpression(1L),
+        var expected = Bin(
+            Lit(1L),
             BinaryOperator.Add,
-            new LiteralExpression(2L));
+            Lit(2L));
 
-        Assert.Equal(expected, expr);
+        Assert.Equal(SyntaxNormalization.Normalize(expected), SyntaxNormalization.Normalize(expr));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("None");
 
-        Assert.Equal(new LiteralExpression(null!), expr);
+        Assert.Equal(SyntaxNormalization.Normalize(Lit(null!)), SyntaxNormalization.Normalize(expr));
     }
 
     [Fact]
@@ -48,11 +48,11 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("[1, 2]");
 
-        var list = Assert.IsType<ListExpression>(expr);
+        var list = Assert.IsType<ListExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Collection(
             list.Items,
-            item => Assert.Equal(new LiteralExpression(1L), item),
-            item => Assert.Equal(new LiteralExpression(2L), item));
+            item => Assert.Equal(Lit(1L), item),
+            item => Assert.Equal(Lit(2L), item));
     }
 
     [Fact]
@@ -60,11 +60,11 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("(1, 2)");
 
-        var tuple = Assert.IsType<TupleExpression>(expr);
+        var tuple = Assert.IsType<TupleExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Collection(
             tuple.Items,
-            item => Assert.Equal(new LiteralExpression(1L), item),
-            item => Assert.Equal(new LiteralExpression(2L), item));
+            item => Assert.Equal(Lit(1L), item),
+            item => Assert.Equal(Lit(2L), item));
     }
 
     [Fact]
@@ -72,8 +72,8 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("(1,)");
 
-        var tuple = Assert.IsType<TupleExpression>(expr);
-        Assert.Collection(tuple.Items, item => Assert.Equal(new LiteralExpression(1L), item));
+        var tuple = Assert.IsType<TupleExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Collection(tuple.Items, item => Assert.Equal(Lit(1L), item));
     }
 
     [Fact]
@@ -81,11 +81,11 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1, 2");
 
-        var tuple = Assert.IsType<TupleExpression>(expr);
+        var tuple = Assert.IsType<TupleExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Collection(
             tuple.Items,
-            item => Assert.Equal(new LiteralExpression(1L), item),
-            item => Assert.Equal(new LiteralExpression(2L), item));
+            item => Assert.Equal(Lit(1L), item),
+            item => Assert.Equal(Lit(2L), item));
     }
 
     [Fact]
@@ -93,18 +93,18 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("{\"a\": 1, \"b\": 2}");
 
-        var dict = Assert.IsType<DictExpression>(expr);
+        var dict = Assert.IsType<DictExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Collection(
             dict.Entries,
             entry =>
             {
-                Assert.Equal(new LiteralExpression("a"), entry.Key);
-                Assert.Equal(new LiteralExpression(1L), entry.Value);
+                Assert.Equal(Lit("a"), entry.Key);
+                Assert.Equal(Lit(1L), entry.Value);
             },
             entry =>
             {
-                Assert.Equal(new LiteralExpression("b"), entry.Key);
-                Assert.Equal(new LiteralExpression(2L), entry.Value);
+                Assert.Equal(Lit("b"), entry.Key);
+                Assert.Equal(Lit(2L), entry.Value);
             });
     }
 
@@ -113,10 +113,10 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("items[0]");
 
-        var index = Assert.IsType<IndexExpression>(expr);
-        Assert.Equal(new IdentifierExpression("items"), index.Target);
+        var index = Assert.IsType<IndexExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Equal(Id("items"), index.Target);
         var indexValue = Assert.IsType<IndexValue>(index.Index);
-        Assert.Equal(new LiteralExpression(0L), indexValue.Value);
+        Assert.Equal(Lit(0L), indexValue.Value);
     }
 
     [Fact]
@@ -124,10 +124,10 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("items[1:3]");
 
-        var index = Assert.IsType<IndexExpression>(expr);
+        var index = Assert.IsType<IndexExpression>(SyntaxNormalization.Normalize(expr));
         var slice = Assert.IsType<SliceIndex>(index.Index);
-        Assert.Equal(new LiteralExpression(1L), slice.Start);
-        Assert.Equal(new LiteralExpression(3L), slice.Stop);
+        Assert.Equal(Lit(1L), slice.Start);
+        Assert.Equal(Lit(3L), slice.Stop);
         Assert.Null(slice.Step);
     }
 
@@ -136,7 +136,7 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1 in [1, 2]");
 
-        var binary = Assert.IsType<BinaryExpression>(expr);
+        var binary = Assert.IsType<BinaryExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Equal(BinaryOperator.In, binary.Operator);
     }
 
@@ -145,7 +145,7 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1 < 2");
 
-        var binary = Assert.IsType<BinaryExpression>(expr);
+        var binary = Assert.IsType<BinaryExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Equal(BinaryOperator.Less, binary.Operator);
     }
 
@@ -154,7 +154,7 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1 not in [2]");
 
-        var binary = Assert.IsType<BinaryExpression>(expr);
+        var binary = Assert.IsType<BinaryExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Equal(BinaryOperator.NotIn, binary.Operator);
     }
 
@@ -163,7 +163,7 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("10 // 3");
 
-        var binary = Assert.IsType<BinaryExpression>(expr);
+        var binary = Assert.IsType<BinaryExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Equal(BinaryOperator.FloorDivide, binary.Operator);
     }
 
@@ -172,10 +172,10 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("1 if True else 0");
 
-        var conditional = Assert.IsType<ConditionalExpression>(expr);
-        Assert.Equal(new LiteralExpression(true), conditional.Condition);
-        Assert.Equal(new LiteralExpression(1L), conditional.ThenExpression);
-        Assert.Equal(new LiteralExpression(0L), conditional.ElseExpression);
+        var conditional = Assert.IsType<ConditionalExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Equal(Lit(true), conditional.Condition);
+        Assert.Equal(Lit(1L), conditional.ThenExpression);
+        Assert.Equal(Lit(0L), conditional.ElseExpression);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("\"a\\n\\t\"");
 
-        Assert.Equal(new LiteralExpression("a\n\t"), expr);
+        Assert.Equal(SyntaxNormalization.Normalize(Lit("a\n\t")), SyntaxNormalization.Normalize(expr));
     }
 
     [Fact]
@@ -191,6 +191,13 @@ public sealed class ExpressionParsingTests
     {
         var expr = StarlarkParser.ParseExpression("\"\\x41\\101\"");
 
-        Assert.Equal(new LiteralExpression("AA"), expr);
+        Assert.Equal(SyntaxNormalization.Normalize(Lit("AA")), SyntaxNormalization.Normalize(expr));
     }
+
+    private static LiteralExpression Lit(object value) => new LiteralExpression(value, default);
+
+    private static IdentifierExpression Id(string name) => new IdentifierExpression(name, default);
+
+    private static BinaryExpression Bin(Expression left, BinaryOperator op, Expression right) =>
+        new BinaryExpression(left, op, right, default);
 }

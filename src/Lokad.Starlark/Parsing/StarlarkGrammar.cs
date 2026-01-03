@@ -13,24 +13,34 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 {
     protected StarlarkGrammar() : base(TokenNamer.Instance) { }
 
-    [Rule]
-    public Expression TrueLiteral([T(Token.True)] Token value) => new LiteralExpression(true);
+    protected static SourceSpan SpanBetween(SourceSpan start, SourceSpan end) => start.MergeWith(end);
+
+    protected static SourceSpan SpanBetween(Expression start, Expression end) => start.Span.MergeWith(end.Span);
+
+    protected static SourceSpan SpanFromToken(Pos<string> token) => token.Location;
 
     [Rule]
-    public Expression FalseLiteral([T(Token.False)] Token value) => new LiteralExpression(false);
+    public Expression TrueLiteral([T(Token.True)] Pos<string> value) =>
+        new LiteralExpression(true, value.Location);
 
     [Rule]
-    public Expression NoneLiteral([T(Token.None)] Token value) => new LiteralExpression(null!);
+    public Expression FalseLiteral([T(Token.False)] Pos<string> value) =>
+        new LiteralExpression(false, value.Location);
 
     [Rule]
-    public Expression NumberLiteral([T(Token.Number)] string value)
+    public Expression NoneLiteral([T(Token.None)] Pos<string> value) =>
+        new LiteralExpression(null!, value.Location);
+
+    [Rule]
+    public Expression NumberLiteral([T(Token.Number)] Pos<string> value)
     {
-        if (value.Contains('.') || value.Contains('e') || value.Contains('E'))
+        var text = value.Value;
+        if (text.Contains('.') || text.Contains('e') || text.Contains('E'))
         {
-            return new LiteralExpression(double.Parse(value, CultureInfo.InvariantCulture));
+            return new LiteralExpression(double.Parse(text, CultureInfo.InvariantCulture), value.Location);
         }
 
-        var (baseValue, sliceStart) = value switch
+        var (baseValue, sliceStart) = text switch
         {
             [ '0', 'x' or 'X', .. ] => (16, 2),
             [ '0', 'o' or 'O', .. ] => (8, 2),
@@ -38,72 +48,73 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             _ => (10, 0)
         };
 
-        var literal = sliceStart == 0 ? value : value[sliceStart..];
-        return new LiteralExpression(Convert.ToInt64(literal, baseValue));
+        var literal = sliceStart == 0 ? text : text[sliceStart..];
+        return new LiteralExpression(Convert.ToInt64(literal, baseValue), value.Location);
     }
 
     [Rule]
-    public Expression StringLiteral([T(Token.String)] string value)
+    public Expression StringLiteral([T(Token.String)] Pos<string> value)
     {
-        return new LiteralExpression(StringLiteralParser.Parse(value));
+        return new LiteralExpression(StringLiteralParser.Parse(value.Value), value.Location);
     }
 
     [Rule]
-    public Expression Identifier([T(Token.Id)] string name) => new IdentifierExpression(name);
+    public Expression Identifier([T(Token.Id)] Pos<string> name) =>
+        new IdentifierExpression(name.Value, name.Location);
 
     [Rule]
     public Expression Parenthesis(
-        [T(Token.OpenParen)] Token open,
+        [T(Token.OpenParen)] Pos<string> open,
         [NT] Expression inner,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.CloseParen)] Pos<string> close)
     {
         return inner;
     }
 
     [Rule]
     public Expression EmptyTupleLiteral(
-        [T(Token.OpenParen)] Token open,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.OpenParen)] Pos<string> open,
+        [T(Token.CloseParen)] Pos<string> close)
     {
-        return new TupleExpression(Array.Empty<Expression>());
+        return new TupleExpression(Array.Empty<Expression>(), SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression TupleLiteral(
-        [T(Token.OpenParen)] Token open,
+        [T(Token.OpenParen)] Pos<string> open,
         [L(Sep = Token.Comma, Min = 2)] Expression[] items,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.CloseParen)] Pos<string> close)
     {
-        return new TupleExpression(items);
+        return new TupleExpression(items, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression SingleTupleLiteral(
-        [T(Token.OpenParen)] Token open,
+        [T(Token.OpenParen)] Pos<string> open,
         [NT] Expression item,
-        [T(Token.Comma)] Token comma,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.Comma)] Pos<string> comma,
+        [T(Token.CloseParen)] Pos<string> close)
     {
-        return new TupleExpression(new[] { item });
+        return new TupleExpression(new[] { item }, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression Call(
         [NT(0)] Expression callee,
-        [T(Token.OpenParen)] Token open,
+        [T(Token.OpenParen)] Pos<string> open,
         [L(Sep = Token.Comma)] CallArgument[] args,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.CloseParen)] Pos<string> close)
     {
-        return new CallExpression(callee, args);
+        return new CallExpression(callee, args, SpanBetween(callee.Span, close.Location));
     }
 
     [Rule]
     public CallArgument NamedArgument(
-        [T(Token.Id)] string name,
-        [T(Token.Assign)] Token assign,
+        [T(Token.Id)] Pos<string> name,
+        [T(Token.Assign)] Pos<string> assign,
         [NT(3)] Expression value)
     {
-        return new CallArgument(CallArgumentKind.Keyword, name, value);
+        return new CallArgument(CallArgumentKind.Keyword, name.Value, value);
     }
 
     [Rule]
@@ -114,7 +125,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public CallArgument StarArgument(
-        [T(Token.Star)] Token star,
+        [T(Token.Star)] Pos<string> star,
         [NT(3)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Star, null, value);
@@ -122,7 +133,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public CallArgument StarStarArgument(
-        [T(Token.StarStar)] Token star,
+        [T(Token.StarStar)] Pos<string> star,
         [NT(3)] Expression value)
     {
         return new CallArgument(CallArgumentKind.StarStar, null, value);
@@ -131,19 +142,19 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public Expression Attribute(
         [NT(0)] Expression target,
-        [T(Token.Dot)] Token dot,
-        [T(Token.Id)] string name)
+        [T(Token.Dot)] Pos<string> dot,
+        [T(Token.Id)] Pos<string> name)
     {
-        return new AttributeExpression(target, name);
+        return new AttributeExpression(target, name.Value, SpanBetween(target.Span, name.Location));
     }
 
     [Rule]
     public Expression ListComprehension(
-        [T(Token.OpenBracket)] Token open,
+        [T(Token.OpenBracket)] Pos<string> open,
         [NT] Expression body,
         [NT] ComprehensionFor forClause,
         [L] ComprehensionQualifier[] qualifiers,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.CloseBracket)] Pos<string> close)
     {
         var clauses = new ComprehensionClause[qualifiers.Length + 1];
         clauses[0] = forClause.Clause;
@@ -152,33 +163,33 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             clauses[i + 1] = qualifiers[i].Clause;
         }
 
-        return new ListComprehensionExpression(body, clauses);
+        return new ListComprehensionExpression(body, clauses, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression ListLiteralMultiple(
-        [T(Token.OpenBracket)] Token open,
+        [T(Token.OpenBracket)] Pos<string> open,
         [L(Sep = Token.Comma, Min = 2)] Expression[] items,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.CloseBracket)] Pos<string> close)
     {
-        return new ListExpression(items);
+        return new ListExpression(items, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression ListLiteralSingle(
-        [T(Token.OpenBracket)] Token open,
+        [T(Token.OpenBracket)] Pos<string> open,
         [NT] Expression item,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.CloseBracket)] Pos<string> close)
     {
-        return new ListExpression(new[] { item });
+        return new ListExpression(new[] { item }, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression ListLiteralEmpty(
-        [T(Token.OpenBracket)] Token open,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.OpenBracket)] Pos<string> open,
+        [T(Token.CloseBracket)] Pos<string> close)
     {
-        return new ListExpression(Array.Empty<Expression>());
+        return new ListExpression(Array.Empty<Expression>(), SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
@@ -192,22 +203,22 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public Expression DictLiteralMultiple(
-        [T(Token.OpenBrace)] Token open,
+        [T(Token.OpenBrace)] Pos<string> open,
         [L(Sep = Token.Comma, Min = 2)] DictEntry[] entries,
-        [T(Token.CloseBrace)] Token close)
+        [T(Token.CloseBrace)] Pos<string> close)
     {
-        return new DictExpression(entries);
+        return new DictExpression(entries, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression DictComprehension(
-        [T(Token.OpenBrace)] Token open,
+        [T(Token.OpenBrace)] Pos<string> open,
         [NT(3)] Expression key,
-        [T(Token.Colon)] Token colon,
+        [T(Token.Colon)] Pos<string> colon,
         [NT(3)] Expression value,
         [NT] ComprehensionFor forClause,
         [L] ComprehensionQualifier[] qualifiers,
-        [T(Token.CloseBrace)] Token close)
+        [T(Token.CloseBrace)] Pos<string> close)
     {
         var clauses = new ComprehensionClause[qualifiers.Length + 1];
         clauses[0] = forClause.Clause;
@@ -216,33 +227,33 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             clauses[i + 1] = qualifiers[i].Clause;
         }
 
-        return new DictComprehensionExpression(key, value, clauses);
+        return new DictComprehensionExpression(key, value, clauses, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression DictLiteralSingle(
-        [T(Token.OpenBrace)] Token open,
+        [T(Token.OpenBrace)] Pos<string> open,
         [NT(3)] Expression key,
-        [T(Token.Colon)] Token colon,
+        [T(Token.Colon)] Pos<string> colon,
         [NT(3)] Expression value,
-        [T(Token.CloseBrace)] Token close)
+        [T(Token.CloseBrace)] Pos<string> close)
     {
-        return new DictExpression(new[] { new DictEntry(key, value) });
+        return new DictExpression(new[] { new DictEntry(key, value) }, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public Expression DictLiteralEmpty(
-        [T(Token.OpenBrace)] Token open,
-        [T(Token.CloseBrace)] Token close)
+        [T(Token.OpenBrace)] Pos<string> open,
+        [T(Token.CloseBrace)] Pos<string> close)
     {
-        return new DictExpression(Array.Empty<DictEntry>());
+        return new DictExpression(Array.Empty<DictEntry>(), SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public ComprehensionFor ComprehensionForClause(
-        [T(Token.For)] Token keyword,
+        [T(Token.For)] Pos<string> keyword,
         [NT] AssignmentTarget target,
-        [T(Token.In)] Token inKeyword,
+        [T(Token.In)] Pos<string> inKeyword,
         [NT(2)] Expression iterable)
     {
         return new ComprehensionFor(
@@ -250,14 +261,15 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 ComprehensionClauseKind.For,
                 target,
                 iterable,
-                null));
+                null,
+                SpanBetween(keyword.Location, iterable.Span)));
     }
 
     [Rule]
     public ComprehensionQualifier ComprehensionQualifierFor(
-        [T(Token.For)] Token keyword,
+        [T(Token.For)] Pos<string> keyword,
         [NT] AssignmentTarget target,
-        [T(Token.In)] Token inKeyword,
+        [T(Token.In)] Pos<string> inKeyword,
         [NT(2)] Expression iterable)
     {
         return new ComprehensionQualifier(
@@ -265,12 +277,13 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 ComprehensionClauseKind.For,
                 target,
                 iterable,
-                null));
+                null,
+                SpanBetween(keyword.Location, iterable.Span)));
     }
 
     [Rule]
     public ComprehensionQualifier ComprehensionQualifierIf(
-        [T(Token.If)] Token keyword,
+        [T(Token.If)] Pos<string> keyword,
         [NT] Expression condition)
     {
         return new ComprehensionQualifier(
@@ -278,92 +291,96 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 ComprehensionClauseKind.If,
                 null,
                 null,
-                condition));
+                condition,
+                SpanBetween(keyword.Location, condition.Span)));
     }
 
     [Rule]
-    public AssignmentTarget TargetName([T(Token.Id)] string name)
+    public AssignmentTarget TargetName([T(Token.Id)] Pos<string> name)
     {
-        return new NameTarget(name);
+        return new NameTarget(name.Value, name.Location);
     }
 
     [Rule]
     public AssignmentTarget TargetIndex(
         [NT(0)] Expression target,
-        [T(Token.OpenBracket)] Token open,
+        [T(Token.OpenBracket)] Pos<string> open,
         [NT] Expression index,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.CloseBracket)] Pos<string> close)
     {
-        return new IndexTarget(target, index);
+        return new IndexTarget(target, index, SpanBetween(target.Span, close.Location));
     }
 
     [Rule]
     public AssignmentTarget TargetTuple(
-        [T(Token.OpenParen)] Token open,
+        [T(Token.OpenParen)] Pos<string> open,
         [L(Sep = Token.Comma, Min = 2)] AssignmentTarget[] items,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.CloseParen)] Pos<string> close)
     {
-        return new TupleTarget(items);
+        return new TupleTarget(items, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public AssignmentTarget TargetSingleTuple(
-        [T(Token.OpenParen)] Token open,
+        [T(Token.OpenParen)] Pos<string> open,
         [NT] AssignmentTarget item,
-        [T(Token.Comma)] Token comma,
-        [T(Token.CloseParen)] Token close)
+        [T(Token.Comma)] Pos<string> comma,
+        [T(Token.CloseParen)] Pos<string> close)
     {
-        return new TupleTarget(new[] { item });
+        return new TupleTarget(new[] { item }, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public AssignmentTarget TargetList(
-        [T(Token.OpenBracket)] Token open,
+        [T(Token.OpenBracket)] Pos<string> open,
         [L(Sep = Token.Comma, Min = 1)] AssignmentTarget[] items,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.CloseBracket)] Pos<string> close)
     {
-        return new ListTarget(items);
+        return new ListTarget(items, SpanBetween(open.Location, close.Location));
     }
 
     [Rule]
     public AssignmentTarget TargetTupleLoose(
         [L(Sep = Token.Comma, Min = 2)] AssignmentTarget[] items)
     {
-        return new TupleTarget(items);
+        return new TupleTarget(items, SpanBetween(items[0].Span, items[^1].Span));
     }
 
     [Rule]
     public Expression Index(
         [NT(0)] Expression target,
-        [T(Token.OpenBracket)] Token open,
+        [T(Token.OpenBracket)] Pos<string> open,
         [NT] IndexSpecifier index,
-        [T(Token.CloseBracket)] Token close)
+        [T(Token.CloseBracket)] Pos<string> close)
     {
-        return new IndexExpression(target, index);
+        return new IndexExpression(target, index, SpanBetween(target.Span, close.Location));
     }
 
     [Rule]
     public IndexSpecifier IndexValue([NT] Expression value)
     {
-        return new IndexValue(value);
+        return new IndexValue(value, value.Span);
     }
 
     [Rule]
     public IndexSpecifier SliceIndex(
         [NTO] Expression? start,
-        [T(Token.Colon)] Token colon,
+        [T(Token.Colon)] Pos<string> colon,
         [NTO] Expression? stop,
         [NTO] SliceStep? step)
     {
-        return new SliceIndex(start, stop, step?.Step);
+        var spanStart = start?.Span ?? colon.Location;
+        var spanEnd = step?.Step?.Span ?? stop?.Span ?? colon.Location;
+        return new SliceIndex(start, stop, step?.Step, SpanBetween(spanStart, spanEnd));
     }
 
     [Rule]
     public SliceStep SliceStep(
-        [T(Token.Colon)] Token colon,
+        [T(Token.Colon)] Pos<string> colon,
         [NTO] Expression? step)
     {
-        return new SliceStep(step);
+        var spanEnd = step?.Span ?? colon.Location;
+        return new SliceStep(step, SpanBetween(colon.Location, spanEnd));
     }
 
     [Rule]
@@ -399,19 +416,19 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule(Rank = 1)]
     public Expression Unary(
-        [T(Token.Plus, Token.Minus, Token.Tilde, Token.Not)] Token op,
+        [T(Token.Plus, Token.Minus, Token.Tilde, Token.Not)] Pos<string> op,
         [NT(1)] Expression operand)
     {
-        var unaryOperator = op switch
+        var unaryOperator = op.Value switch
         {
-            Token.Plus => UnaryOperator.Positive,
-            Token.Minus => UnaryOperator.Negate,
-            Token.Tilde => UnaryOperator.BitwiseNot,
-            Token.Not => UnaryOperator.Not,
-            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+            "+" => UnaryOperator.Positive,
+            "-" => UnaryOperator.Negate,
+            "~" => UnaryOperator.BitwiseNot,
+            "not" => UnaryOperator.Not,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op.Value, null)
         };
 
-        return new UnaryExpression(unaryOperator, operand);
+        return new UnaryExpression(unaryOperator, operand, SpanBetween(op.Location, operand.Span));
     }
 
     public struct InfixRight
@@ -475,7 +492,11 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     {
         if (right.Length == 1)
         {
-            return new BinaryExpression(left, right[0].Operator, right[0].Right);
+            return new BinaryExpression(
+                left,
+                right[0].Operator,
+                right[0].Right,
+                SpanBetween(left.Span, right[0].Right.Span));
         }
 
         var length = right.Length;
@@ -487,7 +508,11 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 if (right[i].Operator.Priority() == priority)
                 {
                     var myLeft = j == 0 ? left : right[j - 1].Right;
-                    var expr = new BinaryExpression(myLeft, right[i].Operator, right[i].Right);
+                    var expr = new BinaryExpression(
+                        myLeft,
+                        right[i].Operator,
+                        right[i].Right,
+                        SpanBetween(myLeft.Span, right[i].Right.Span));
 
                     if (j == 0)
                     {
@@ -515,29 +540,33 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule(Rank = 3)]
     public Expression Conditional(
         [NT(2)] Expression thenExpression,
-        [T(Token.If)] Token keyword,
+        [T(Token.If)] Pos<string> keyword,
         [NT(2)] Expression condition,
-        [T(Token.Else)] Token elseKeyword,
+        [T(Token.Else)] Pos<string> elseKeyword,
         [NT(3)] Expression elseExpression)
     {
-        return new ConditionalExpression(condition, thenExpression, elseExpression);
+        return new ConditionalExpression(
+            condition,
+            thenExpression,
+            elseExpression,
+            SpanBetween(thenExpression.Span, elseExpression.Span));
     }
 
     [Rule(Rank = 5)]
     public Expression Lambda(
-        [T(Token.Lambda)] Token keyword,
+        [T(Token.Lambda)] Pos<string> keyword,
         [L(Sep = Token.Comma)] FunctionParameter[] parameters,
-        [T(Token.Colon)] Token colon,
+        [T(Token.Colon)] Pos<string> colon,
         [NT(5)] Expression body)
     {
         ValidateParameters(parameters, "lambda");
-        return new LambdaExpression(parameters, body);
+        return new LambdaExpression(parameters, body, SpanBetween(keyword.Location, body.Span));
     }
 
     [Rule(Rank = 4)]
     public Expression TupleExpression(
         [NT(2)] Expression first,
-        [T(Token.Comma)] Token comma,
+        [T(Token.Comma)] Pos<string> comma,
         [L(Sep = Token.Comma)] Expression[] rest)
     {
         var items = new Expression[rest.Length + 1];
@@ -547,7 +576,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             items[i + 1] = rest[i];
         }
 
-        return new TupleExpression(items);
+        return new TupleExpression(items, SpanBetween(first.Span, items[^1].Span));
     }
 
 
@@ -671,10 +700,14 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     {
         return expression switch
         {
-            IdentifierExpression identifier => new NameTarget(identifier.Name),
+            IdentifierExpression identifier => new NameTarget(identifier.Name, identifier.Span),
             IndexExpression index => ToIndexTarget(index),
-            ListExpression list => new ListTarget(list.Items.Select(ToAssignmentTarget).ToArray()),
-            TupleExpression tuple => new TupleTarget(tuple.Items.Select(ToAssignmentTarget).ToArray()),
+            ListExpression list => new ListTarget(
+                list.Items.Select(ToAssignmentTarget).ToArray(),
+                list.Span),
+            TupleExpression tuple => new TupleTarget(
+                tuple.Items.Select(ToAssignmentTarget).ToArray(),
+                tuple.Span),
             _ => throw new InvalidOperationException(
                 $"Invalid assignment target '{expression.GetType().Name}'.")
         };
@@ -687,7 +720,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             throw new InvalidOperationException("Slice assignment is not supported.");
         }
 
-        return new IndexTarget(index.Target, indexValue.Value);
+        return new IndexTarget(index.Target, indexValue.Value, index.Span);
     }
 
     protected static void ValidateParameters(IReadOnlyList<FunctionParameter> parameters, string functionName)
@@ -763,7 +796,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
 public readonly record struct LineEnding;
 
-public readonly record struct SliceStep(Expression? Step);
+public readonly record struct SliceStep(Expression? Step, SourceSpan Span);
 
 public readonly record struct ComprehensionFor(ComprehensionClause Clause);
 

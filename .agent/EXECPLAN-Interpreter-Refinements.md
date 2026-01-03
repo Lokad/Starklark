@@ -11,7 +11,7 @@ The goal is to make the Starlark runtime easier to integrate and more reliable b
 ## Progress
 
 - [x] (2026-01-03 20:58Z) Create a dedicated runtime exception type and convert key runtime error sites to use it.
-- [ ] (2026-01-03 20:40Z) Attach source spans to runtime errors where syntax nodes provide locations.
+- [x] (2026-01-03 21:14Z) Attach source spans to runtime errors where syntax nodes provide locations.
 - [ ] (2026-01-03 20:40Z) Consolidate augmented assignment operator logic with shared binary operator handling.
 - [ ] (2026-01-03 20:40Z) Add indexed storage for dict/set to improve lookup performance without changing order or semantics.
 - [ ] (2026-01-03 20:40Z) Add an argument binder helper and migrate repetitive builtin/method argument validation.
@@ -63,6 +63,10 @@ Edits are additive and can be re-run safely. If a change partially applies and b
 ## Artifacts and Notes
 
 Store short test outputs and error examples here as indented snippets when they are generated. Keep them brief, such as a one-line exception message or the final test summary.
+
+- 2026-01-03: `dotnet test` summary
+  - Passed: 215, Failed: 0, Skipped: 0 (net8.0)
+  - Passed: 215, Failed: 0, Skipped: 0 (net10.0)
 
 ## Interfaces and Dependencies
 

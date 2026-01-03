@@ -1,43 +1,47 @@
 using System.Collections.Generic;
+using Lokad.Parsing;
 
 namespace Lokad.Starlark.Syntax;
 
-public abstract record Expression;
+public abstract record Expression(SourceSpan Span);
 
-public sealed record LiteralExpression(object Value) : Expression;
+public sealed record LiteralExpression(object Value, SourceSpan Span) : Expression(Span);
 
-public sealed record IdentifierExpression(string Name) : Expression;
+public sealed record IdentifierExpression(string Name, SourceSpan Span) : Expression(Span);
 
-public sealed record UnaryExpression(UnaryOperator Operator, Expression Operand) : Expression;
+public sealed record UnaryExpression(UnaryOperator Operator, Expression Operand, SourceSpan Span) : Expression(Span);
 
-public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, Expression Right) : Expression;
+public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, Expression Right, SourceSpan Span) : Expression(Span);
 
-public sealed record CallExpression(Expression Callee, IReadOnlyList<CallArgument> Arguments) : Expression;
+public sealed record CallExpression(Expression Callee, IReadOnlyList<CallArgument> Arguments, SourceSpan Span) : Expression(Span);
 
 public sealed record CallArgument(CallArgumentKind Kind, string? Name, Expression Value);
 
-public sealed record ListExpression(IReadOnlyList<Expression> Items) : Expression;
+public sealed record ListExpression(IReadOnlyList<Expression> Items, SourceSpan Span) : Expression(Span);
 
-public sealed record TupleExpression(IReadOnlyList<Expression> Items) : Expression;
+public sealed record TupleExpression(IReadOnlyList<Expression> Items, SourceSpan Span) : Expression(Span);
 
-public sealed record DictExpression(IReadOnlyList<DictEntry> Entries) : Expression;
+public sealed record DictExpression(IReadOnlyList<DictEntry> Entries, SourceSpan Span) : Expression(Span);
 
 public sealed record DictEntry(Expression Key, Expression Value);
 
 public sealed record ListComprehensionExpression(
     Expression Body,
-    IReadOnlyList<ComprehensionClause> Clauses) : Expression;
+    IReadOnlyList<ComprehensionClause> Clauses,
+    SourceSpan Span) : Expression(Span);
 
 public sealed record DictComprehensionExpression(
     Expression Key,
     Expression Value,
-    IReadOnlyList<ComprehensionClause> Clauses) : Expression;
+    IReadOnlyList<ComprehensionClause> Clauses,
+    SourceSpan Span) : Expression(Span);
 
 public sealed record ComprehensionClause(
     ComprehensionClauseKind Kind,
     AssignmentTarget? Target,
     Expression? Iterable,
-    Expression? Condition);
+    Expression? Condition,
+    SourceSpan Span);
 
 public enum ComprehensionClauseKind
 {
@@ -45,24 +49,26 @@ public enum ComprehensionClauseKind
     If
 }
 
-public abstract record IndexSpecifier;
+public abstract record IndexSpecifier(SourceSpan Span);
 
-public sealed record IndexValue(Expression Value) : IndexSpecifier;
+public sealed record IndexValue(Expression Value, SourceSpan Span) : IndexSpecifier(Span);
 
-public sealed record SliceIndex(Expression? Start, Expression? Stop, Expression? Step) : IndexSpecifier;
+public sealed record SliceIndex(Expression? Start, Expression? Stop, Expression? Step, SourceSpan Span) : IndexSpecifier(Span);
 
-public sealed record IndexExpression(Expression Target, IndexSpecifier Index) : Expression;
+public sealed record IndexExpression(Expression Target, IndexSpecifier Index, SourceSpan Span) : Expression(Span);
 
-public sealed record AttributeExpression(Expression Target, string Name) : Expression;
+public sealed record AttributeExpression(Expression Target, string Name, SourceSpan Span) : Expression(Span);
 
 public sealed record ConditionalExpression(
     Expression Condition,
     Expression ThenExpression,
-    Expression ElseExpression) : Expression;
+    Expression ElseExpression,
+    SourceSpan Span) : Expression(Span);
 
 public sealed record LambdaExpression(
     IReadOnlyList<FunctionParameter> Parameters,
-    Expression Body) : Expression;
+    Expression Body,
+    SourceSpan Span) : Expression(Span);
 
 public enum CallArgumentKind
 {

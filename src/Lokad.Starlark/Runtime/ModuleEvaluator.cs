@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Lokad.Parsing;
 using Lokad.Starlark.Syntax;
 
 namespace Lokad.Starlark.Runtime;
@@ -14,13 +15,13 @@ public sealed class ModuleEvaluator
         switch (result.Kind)
         {
             case FlowKind.Return:
-                RuntimeErrors.Throw("Return statement is not allowed at module scope.");
+                RuntimeErrors.Throw("Return statement is not allowed at module scope.", result.Span);
                 break;
             case FlowKind.Break:
-                RuntimeErrors.Throw("Break statement is not allowed at module scope.");
+                RuntimeErrors.Throw("Break statement is not allowed at module scope.", result.Span);
                 break;
             case FlowKind.Continue:
-                RuntimeErrors.Throw("Continue statement is not allowed at module scope.");
+                RuntimeErrors.Throw("Continue statement is not allowed at module scope.", result.Span);
                 break;
             default:
                 return result.LastValue;
@@ -37,10 +38,10 @@ public sealed class ModuleEvaluator
             case FlowKind.Return:
                 return result.Value ?? StarlarkNone.Instance;
             case FlowKind.Break:
-                RuntimeErrors.Throw("Break statement is only valid inside loops.");
+                RuntimeErrors.Throw("Break statement is only valid inside loops.", result.Span);
                 break;
             case FlowKind.Continue:
-                RuntimeErrors.Throw("Continue statement is only valid inside loops.");
+                RuntimeErrors.Throw("Continue statement is only valid inside loops.", result.Span);
                 break;
             default:
                 return StarlarkNone.Instance;
@@ -109,11 +110,11 @@ public sealed class ModuleEvaluator
                     var returnValue = returnStatement.Value == null
                         ? StarlarkNone.Instance
                         : _expressionEvaluator.Evaluate(returnStatement.Value, environment);
-                    return FlowResult.Return(returnValue);
+                    return FlowResult.Return(returnValue, returnStatement.Span);
                 case BreakStatement:
-                    return FlowResult.Break();
+                    return FlowResult.Break(statement.Span);
                 case ContinueStatement:
-                    return FlowResult.Continue();
+                    return FlowResult.Continue(statement.Span);
                 case PassStatement:
                     lastValue = null;
                     break;
@@ -149,7 +150,7 @@ public sealed class ModuleEvaluator
     {
         var iterable = _expressionEvaluator.Evaluate(forStatement.Iterable, environment);
 
-        foreach (var item in Enumerate(iterable))
+        foreach (var item in Enumerate(iterable, forStatement.Iterable.Span))
         {
             AssignTarget(forStatement.Target, item, environment);
             var bodyResult = ExecuteStatements(forStatement.Body, environment);
@@ -171,19 +172,21 @@ public sealed class ModuleEvaluator
     {
         if (environment.Parent != null)
         {
-            RuntimeErrors.Throw("load statements may only appear at top level.");
+            RuntimeErrors.Throw("load statements may only appear at top level.", loadStatement.Span);
         }
 
         if (!environment.Modules.TryGetValue(loadStatement.Module, out var module))
         {
-            RuntimeErrors.Throw($"Module '{loadStatement.Module}' not found.");
+            RuntimeErrors.Throw($"Module '{loadStatement.Module}' not found.", loadStatement.Span);
         }
 
         foreach (var binding in loadStatement.Bindings)
         {
             if (!module.TryGetValue(binding.Name, out var value))
             {
-                RuntimeErrors.Throw($"Symbol '{binding.Name}' not found in module '{loadStatement.Module}'.");
+                RuntimeErrors.Throw(
+                    $"Symbol '{binding.Name}' not found in module '{loadStatement.Module}'.",
+                    loadStatement.Span);
             }
 
             environment.Set(binding.Alias, value);
@@ -207,7 +210,9 @@ public sealed class ModuleEvaluator
                 AssignSequenceTargets(listTarget.Items, value, environment);
                 break;
             default:
-                RuntimeErrors.Throw($"Unsupported assignment target '{target.GetType().Name}'.");
+                RuntimeErrors.Throw(
+                    $"Unsupported assignment target '{target.GetType().Name}'.",
+                    target.Span);
                 break;
         }
     }
@@ -224,7 +229,8 @@ public sealed class ModuleEvaluator
                 break;
             default:
                 RuntimeErrors.Throw(
-                    $"Augmented assignment not supported for '{assignment.Target.GetType().Name}'.");
+                    $"Augmented assignment not supported for '{assignment.Target.GetType().Name}'.",
+                    assignment.Target.Span);
                 break;
         }
     }
@@ -236,7 +242,7 @@ public sealed class ModuleEvaluator
     {
         if (!environment.TryGet(target.Name, out var existing))
         {
-            RuntimeErrors.Throw($"Undefined identifier '{target.Name}'.");
+            RuntimeErrors.Throw($"Undefined identifier '{target.Name}'.", target.Span);
         }
 
         var right = _expressionEvaluator.Evaluate(assignment.Value, environment);
@@ -288,20 +294,22 @@ public sealed class ModuleEvaluator
     {
         var container = _expressionEvaluator.Evaluate(target.Target, environment);
         var index = _expressionEvaluator.Evaluate(target.Index, environment);
-        var existing = GetIndexedValue(container, index);
+        var existing = GetIndexedValue(container, index, target.Span);
         var right = _expressionEvaluator.Evaluate(assignment.Value, environment);
         var result = ApplyBinaryOperator(assignment.Operator, existing, right);
 
         switch (container)
         {
             case StarlarkList list:
-                AssignListIndex(list, index, result);
+                AssignListIndex(list, index, result, target.Span);
                 break;
             case StarlarkDict dict:
                 AssignDictIndex(dict, index, result);
                 break;
             default:
-                RuntimeErrors.Throw($"Index assignment not supported for '{container.TypeName}'.");
+                RuntimeErrors.Throw(
+                    $"Index assignment not supported for '{container.TypeName}'.",
+                    target.Span);
                 break;
         }
     }
@@ -331,41 +339,42 @@ public sealed class ModuleEvaluator
         }
     }
 
-    private static StarlarkValue GetIndexedValue(StarlarkValue container, StarlarkValue index)
+    private static StarlarkValue GetIndexedValue(StarlarkValue container, StarlarkValue index, SourceSpan span)
     {
         return container switch
         {
-            StarlarkList list => IndexList(list, index),
-            StarlarkTuple tuple => IndexTuple(tuple, index),
-            StarlarkString text => IndexString(text, index),
-            StarlarkDict dict => IndexDict(dict, index),
+            StarlarkList list => IndexList(list, index, span),
+            StarlarkTuple tuple => IndexTuple(tuple, index, span),
+            StarlarkString text => IndexString(text, index, span),
+            StarlarkDict dict => IndexDict(dict, index, span),
             _ => RuntimeErrors.Fail<StarlarkValue>(
-                $"Indexing not supported for '{container.TypeName}'.")
+                $"Indexing not supported for '{container.TypeName}'.",
+                span)
         };
     }
 
-    private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index)
+    private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, list.Items.Count);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, list.Items.Count, span);
         return list.Items[resolved];
     }
 
-    private static StarlarkValue IndexTuple(StarlarkTuple tuple, StarlarkValue index)
+    private static StarlarkValue IndexTuple(StarlarkTuple tuple, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, tuple.Items.Count);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, tuple.Items.Count, span);
         return tuple.Items[resolved];
     }
 
-    private static StarlarkValue IndexString(StarlarkString text, StarlarkValue index)
+    private static StarlarkValue IndexString(StarlarkString text, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, text.Value.Length);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, text.Value.Length, span);
         return new StarlarkString(text.Value[resolved].ToString());
     }
 
-    private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
+    private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key, SourceSpan span)
     {
         StarlarkHash.EnsureHashable(key);
         foreach (var entry in dict.Entries)
@@ -376,26 +385,26 @@ public sealed class ModuleEvaluator
             }
         }
 
-        RuntimeErrors.Throw("Key not found in dict.");
+        RuntimeErrors.Throw("Key not found in dict.", span);
         return StarlarkNone.Instance;
     }
 
-    private static int RequireIndex(StarlarkValue index)
+    private static int RequireIndex(StarlarkValue index, SourceSpan span)
     {
         if (index is StarlarkInt intValue)
         {
             return checked((int)intValue.Value);
         }
 
-        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.");
+        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.", span);
     }
 
-    private static int ResolveIndex(int position, int length)
+    private static int ResolveIndex(int position, int length, SourceSpan span)
     {
         var resolved = position < 0 ? length + position : position;
         if (resolved < 0 || resolved >= length)
         {
-            return RuntimeErrors.Fail<int>("Index out of range.");
+            return RuntimeErrors.Fail<int>("Index out of range.", span);
         }
 
         return resolved;
@@ -854,13 +863,15 @@ public sealed class ModuleEvaluator
         switch (container)
         {
             case StarlarkList list:
-                AssignListIndex(list, index, value);
+                AssignListIndex(list, index, value, target.Span);
                 break;
             case StarlarkDict dict:
                 AssignDictIndex(dict, index, value);
                 break;
             default:
-                RuntimeErrors.Throw($"Index assignment not supported for '{container.TypeName}'.");
+                RuntimeErrors.Throw(
+                    $"Index assignment not supported for '{container.TypeName}'.",
+                    target.Span);
                 break;
         }
     }
@@ -874,7 +885,8 @@ public sealed class ModuleEvaluator
         if (items.Count != targets.Count)
         {
             RuntimeErrors.Throw(
-                $"Assignment length mismatch. Expected {targets.Count} values but got {items.Count}.");
+                $"Assignment length mismatch. Expected {targets.Count} values but got {items.Count}.",
+                targets.Count > 0 ? targets[0].Span : null);
         }
 
         for (var i = 0; i < targets.Count; i++)
@@ -894,12 +906,16 @@ public sealed class ModuleEvaluator
         };
     }
 
-    private static void AssignListIndex(StarlarkList list, StarlarkValue index, StarlarkValue value)
+    private static void AssignListIndex(
+        StarlarkList list,
+        StarlarkValue index,
+        StarlarkValue value,
+        SourceSpan span)
     {
         var intIndex = index as StarlarkInt;
         if (intIndex == null)
         {
-            RuntimeErrors.Throw($"Index must be an int, got '{index.TypeName}'.");
+            RuntimeErrors.Throw($"Index must be an int, got '{index.TypeName}'.", span);
         }
 
         var position = checked((int)intIndex.Value);
@@ -910,7 +926,7 @@ public sealed class ModuleEvaluator
 
         if (position < 0 || position >= list.Items.Count)
         {
-            RuntimeErrors.Throw("Index out of range.");
+            RuntimeErrors.Throw("Index out of range.", span);
         }
 
         list.Items[position] = value;
@@ -1084,7 +1100,7 @@ public sealed class ModuleEvaluator
         return false;
     }
 
-    private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable)
+    private static IEnumerable<StarlarkValue> Enumerate(StarlarkValue iterable, SourceSpan span)
     {
         switch (iterable)
         {
@@ -1141,7 +1157,7 @@ public sealed class ModuleEvaluator
                 }
                 yield break;
             default:
-                RuntimeErrors.Throw($"Type '{iterable.TypeName}' is not iterable.");
+                RuntimeErrors.Throw($"Type '{iterable.TypeName}' is not iterable.", span);
                 yield break;
         }
     }
@@ -1155,27 +1171,29 @@ public sealed class ModuleEvaluator
 
     private readonly struct FlowResult
     {
-        private FlowResult(FlowKind kind, StarlarkValue? value, StarlarkValue? lastValue)
+        private FlowResult(FlowKind kind, StarlarkValue? value, StarlarkValue? lastValue, SourceSpan? span)
         {
             Kind = kind;
             Value = value;
             LastValue = lastValue;
+            Span = span;
         }
 
         public FlowKind Kind { get; }
         public StarlarkValue? Value { get; }
         public StarlarkValue? LastValue { get; }
+        public SourceSpan? Span { get; }
 
         public static FlowResult Normal(StarlarkValue? lastValue) =>
-            new FlowResult(FlowKind.Normal, null, lastValue);
+            new FlowResult(FlowKind.Normal, null, lastValue, null);
 
-        public static FlowResult Return(StarlarkValue value) =>
-            new FlowResult(FlowKind.Return, value, null);
+        public static FlowResult Return(StarlarkValue value, SourceSpan? span) =>
+            new FlowResult(FlowKind.Return, value, null, span);
 
-        public static FlowResult Break() =>
-            new FlowResult(FlowKind.Break, null, null);
+        public static FlowResult Break(SourceSpan? span) =>
+            new FlowResult(FlowKind.Break, null, null, span);
 
-        public static FlowResult Continue() =>
-            new FlowResult(FlowKind.Continue, null, null);
+        public static FlowResult Continue(SourceSpan? span) =>
+            new FlowResult(FlowKind.Continue, null, null, span);
     }
 }

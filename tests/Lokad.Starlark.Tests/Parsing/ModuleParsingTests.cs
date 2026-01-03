@@ -12,10 +12,10 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("x = 1\n");
 
         var statement = Assert.Single(module.Statements);
-        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
         var target = Assert.IsType<NameTarget>(assignment.Target);
         Assert.Equal("x", target.Name);
-        Assert.Equal(new LiteralExpression(1L), assignment.Value);
+        Assert.Equal(Lit(1L), assignment.Value);
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("a, b = 1, 2\n");
 
         var statement = Assert.Single(module.Statements);
-        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
         var target = Assert.IsType<TupleTarget>(assignment.Target);
         Assert.Equal(2, target.Items.Count);
     }
@@ -35,7 +35,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("items[0] = 1\n");
 
         var statement = Assert.Single(module.Statements);
-        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
         Assert.IsType<IndexTarget>(assignment.Target);
     }
 
@@ -45,7 +45,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("x += 1\n");
 
         var statement = Assert.Single(module.Statements);
-        var assignment = Assert.IsType<AugmentedAssignmentStatement>(statement);
+        var assignment = Assert.IsType<AugmentedAssignmentStatement>(SyntaxNormalization.Normalize(statement));
         Assert.Equal(BinaryOperator.Add, assignment.Operator);
     }
 
@@ -55,12 +55,9 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("1 + 2\n");
 
         var statement = Assert.Single(module.Statements);
-        var expressionStatement = Assert.IsType<ExpressionStatement>(statement);
+        var expressionStatement = Assert.IsType<ExpressionStatement>(SyntaxNormalization.Normalize(statement));
         Assert.Equal(
-            new BinaryExpression(
-                new LiteralExpression(1L),
-                BinaryOperator.Add,
-                new LiteralExpression(2L)),
+            Bin(Lit(1L), BinaryOperator.Add, Lit(2L)),
             expressionStatement.Expression);
     }
 
@@ -70,9 +67,9 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("if True: x = 1\n");
 
         var statement = Assert.Single(module.Statements);
-        var ifStatement = Assert.IsType<IfStatement>(statement);
+        var ifStatement = Assert.IsType<IfStatement>(SyntaxNormalization.Normalize(statement));
         var clause = Assert.Single(ifStatement.Clauses);
-        Assert.Equal(new LiteralExpression(true), clause.Condition);
+        Assert.Equal(Lit(true), clause.Condition);
         Assert.Single(clause.Statements);
         Assert.Empty(ifStatement.ElseStatements);
     }
@@ -83,9 +80,9 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("if True:\n  x = 1\n");
 
         var statement = Assert.Single(module.Statements);
-        var ifStatement = Assert.IsType<IfStatement>(statement);
+        var ifStatement = Assert.IsType<IfStatement>(SyntaxNormalization.Normalize(statement));
         var clause = Assert.Single(ifStatement.Clauses);
-        Assert.Equal(new LiteralExpression(true), clause.Condition);
+        Assert.Equal(Lit(true), clause.Condition);
         Assert.Single(clause.Statements);
         Assert.Empty(ifStatement.ElseStatements);
     }
@@ -96,7 +93,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("if True:\n  x = 1\nelif False:\n  x = 2\nelse:\n  x = 3\n");
 
         var statement = Assert.Single(module.Statements);
-        var ifStatement = Assert.IsType<IfStatement>(statement);
+        var ifStatement = Assert.IsType<IfStatement>(SyntaxNormalization.Normalize(statement));
         Assert.Equal(2, ifStatement.Clauses.Count);
         Assert.Single(ifStatement.ElseStatements);
     }
@@ -107,7 +104,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("for x in [1, 2]:\n  x\n");
 
         var statement = Assert.Single(module.Statements);
-        var forStatement = Assert.IsType<ForStatement>(statement);
+        var forStatement = Assert.IsType<ForStatement>(SyntaxNormalization.Normalize(statement));
         var target = Assert.IsType<NameTarget>(forStatement.Target);
         Assert.Equal("x", target.Name);
     }
@@ -118,7 +115,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("for x, y in [(1, 2)]:\n  x\n");
 
         var statement = Assert.Single(module.Statements);
-        var forStatement = Assert.IsType<ForStatement>(statement);
+        var forStatement = Assert.IsType<ForStatement>(SyntaxNormalization.Normalize(statement));
         var target = Assert.IsType<TupleTarget>(forStatement.Target);
         Assert.Equal(2, target.Items.Count);
     }
@@ -144,7 +141,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("def add(a, b):\n  return a + b\n");
 
         var statement = Assert.Single(module.Statements);
-        var function = Assert.IsType<FunctionDefinitionStatement>(statement);
+        var function = Assert.IsType<FunctionDefinitionStatement>(SyntaxNormalization.Normalize(statement));
         Assert.Equal("add", function.Name);
         Assert.Collection(
             function.Parameters,
@@ -169,7 +166,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("def f(*args, **kwargs):\n  return (args, kwargs)\n");
 
         var statement = Assert.Single(module.Statements);
-        var function = Assert.IsType<FunctionDefinitionStatement>(statement);
+        var function = Assert.IsType<FunctionDefinitionStatement>(SyntaxNormalization.Normalize(statement));
         Assert.Collection(
             function.Parameters,
             parameter =>
@@ -190,7 +187,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("items = [x for x in [1, 2]]\n");
 
         var statement = Assert.Single(module.Statements);
-        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
         var comprehension = Assert.IsType<ListComprehensionExpression>(assignment.Value);
         Assert.Single(comprehension.Clauses);
         var clause = comprehension.Clauses[0];
@@ -204,7 +201,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("items = {x: x for x in [1, 2]}\n");
 
         var statement = Assert.Single(module.Statements);
-        var assignment = Assert.IsType<AssignmentStatement>(statement);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
         var comprehension = Assert.IsType<DictComprehensionExpression>(assignment.Value);
         Assert.Single(comprehension.Clauses);
     }
@@ -215,7 +212,7 @@ public sealed class ModuleParsingTests
         var module = StarlarkModuleParser.ParseModule("load(\"math\", \"sin\", cosine=\"cos\")\n");
 
         var statement = Assert.Single(module.Statements);
-        var load = Assert.IsType<LoadStatement>(statement);
+        var load = Assert.IsType<LoadStatement>(SyntaxNormalization.Normalize(statement));
         Assert.Equal("math", load.Module);
         Assert.Collection(
             load.Bindings,
@@ -230,4 +227,9 @@ public sealed class ModuleParsingTests
                 Assert.Equal("cosine", binding.Alias);
             });
     }
+
+    private static LiteralExpression Lit(object value) => new LiteralExpression(value, default);
+
+    private static BinaryExpression Bin(Expression left, BinaryOperator op, Expression right) =>
+        new BinaryExpression(left, op, right, default);
 }

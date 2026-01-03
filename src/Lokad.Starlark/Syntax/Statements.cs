@@ -1,43 +1,48 @@
 using System.Collections.Generic;
+using Lokad.Parsing;
 
 namespace Lokad.Starlark.Syntax;
 
-public abstract record Statement;
+public abstract record Statement(SourceSpan Span);
 
-public sealed record ExpressionStatement(Expression Expression) : Statement;
+public sealed record ExpressionStatement(Expression Expression, SourceSpan Span) : Statement(Span);
 
-public sealed record AssignmentStatement(AssignmentTarget Target, Expression Value) : Statement;
+public sealed record AssignmentStatement(AssignmentTarget Target, Expression Value, SourceSpan Span) : Statement(Span);
 
-public abstract record AssignmentTarget;
+public abstract record AssignmentTarget(SourceSpan Span);
 
-public sealed record NameTarget(string Name) : AssignmentTarget;
+public sealed record NameTarget(string Name, SourceSpan Span) : AssignmentTarget(Span);
 
-public sealed record IndexTarget(Expression Target, Expression Index) : AssignmentTarget;
+public sealed record IndexTarget(Expression Target, Expression Index, SourceSpan Span) : AssignmentTarget(Span);
 
-public sealed record TupleTarget(IReadOnlyList<AssignmentTarget> Items) : AssignmentTarget;
+public sealed record TupleTarget(IReadOnlyList<AssignmentTarget> Items, SourceSpan Span) : AssignmentTarget(Span);
 
-public sealed record ListTarget(IReadOnlyList<AssignmentTarget> Items) : AssignmentTarget;
+public sealed record ListTarget(IReadOnlyList<AssignmentTarget> Items, SourceSpan Span) : AssignmentTarget(Span);
 
 public sealed record AugmentedAssignmentStatement(
     AssignmentTarget Target,
     BinaryOperator Operator,
-    Expression Value) : Statement;
+    Expression Value,
+    SourceSpan Span) : Statement(Span);
 
-public sealed record IfClause(Expression Condition, IReadOnlyList<Statement> Statements);
+public sealed record IfClause(Expression Condition, IReadOnlyList<Statement> Statements, SourceSpan Span);
 
 public sealed record IfStatement(
     IReadOnlyList<IfClause> Clauses,
-    IReadOnlyList<Statement> ElseStatements) : Statement;
+    IReadOnlyList<Statement> ElseStatements,
+    SourceSpan Span) : Statement(Span);
 
 public sealed record ForStatement(
     AssignmentTarget Target,
     Expression Iterable,
-    IReadOnlyList<Statement> Body) : Statement;
+    IReadOnlyList<Statement> Body,
+    SourceSpan Span) : Statement(Span);
 
 public sealed record FunctionDefinitionStatement(
     string Name,
     IReadOnlyList<FunctionParameter> Parameters,
-    IReadOnlyList<Statement> Body) : Statement;
+    IReadOnlyList<Statement> Body,
+    SourceSpan Span) : Statement(Span);
 
 public sealed record FunctionParameter(string Name, Expression? Default, ParameterKind Kind);
 
@@ -48,14 +53,14 @@ public enum ParameterKind
     KwArgs
 }
 
-public sealed record ReturnStatement(Expression? Value) : Statement;
+public sealed record ReturnStatement(Expression? Value, SourceSpan Span) : Statement(Span);
 
-public sealed record BreakStatement : Statement;
+public sealed record BreakStatement(SourceSpan Span) : Statement(Span);
 
-public sealed record ContinueStatement : Statement;
+public sealed record ContinueStatement(SourceSpan Span) : Statement(Span);
 
-public sealed record PassStatement : Statement;
+public sealed record PassStatement(SourceSpan Span) : Statement(Span);
 
 public sealed record LoadBinding(string Name, string Alias);
 
-public sealed record LoadStatement(string Module, IReadOnlyList<LoadBinding> Bindings) : Statement;
+public sealed record LoadStatement(string Module, IReadOnlyList<LoadBinding> Bindings, SourceSpan Span) : Statement(Span);

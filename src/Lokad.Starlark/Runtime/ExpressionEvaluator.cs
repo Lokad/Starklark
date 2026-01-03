@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Lokad.Parsing;
 using Lokad.Starlark.Syntax;
 
 namespace Lokad.Starlark.Runtime;
@@ -50,7 +51,7 @@ public sealed class ExpressionEvaluator
     {
         if (!environment.TryGet(identifier.Name, out var value))
         {
-            RuntimeErrors.Throw($"Undefined identifier '{identifier.Name}'.");
+            RuntimeErrors.Throw($"Undefined identifier '{identifier.Name}'.", identifier.Span);
         }
 
         return value;
@@ -156,7 +157,7 @@ public sealed class ExpressionEvaluator
     {
         var (names, defaults, varArgsName, kwArgsName) =
             FunctionParameterEvaluator.Evaluate(lambda.Parameters, environment);
-        var body = new Statement[] { new ReturnStatement(lambda.Body) };
+        var body = new Statement[] { new ReturnStatement(lambda.Body, lambda.Body.Span) };
         var locals = FunctionLocalAnalyzer.CollectLocals(lambda.Parameters, body);
         return new StarlarkUserFunction(
             "lambda",
@@ -175,7 +176,9 @@ public sealed class ExpressionEvaluator
         var function = callee as StarlarkCallable;
         if (function == null)
         {
-            RuntimeErrors.Throw($"Attempted to call non-callable value of type '{callee.TypeName}'.");
+            RuntimeErrors.Throw(
+                $"Attempted to call non-callable value of type '{callee.TypeName}'.",
+                call.Span);
         }
 
         var args = new List<StarlarkValue>(call.Arguments.Count);
@@ -192,7 +195,9 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.Positional:
                     if (seenKeyword || seenStar)
                     {
-                        RuntimeErrors.Throw("Positional argument follows keyword or *args argument.");
+                        RuntimeErrors.Throw(
+                            "Positional argument follows keyword or *args argument.",
+                            call.Span);
                     }
 
                     args.Add(Evaluate(argument.Value, environment));
@@ -200,18 +205,20 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.Keyword:
                     if (seenStarStar)
                     {
-                        RuntimeErrors.Throw("Keyword argument follows **kwargs argument.");
+                        RuntimeErrors.Throw("Keyword argument follows **kwargs argument.", call.Span);
                     }
 
                     seenKeyword = true;
                     if (argument.Name == null)
                     {
-                        RuntimeErrors.Throw("Keyword argument missing name.");
+                        RuntimeErrors.Throw("Keyword argument missing name.", call.Span);
                     }
 
                     if (kwargs.ContainsKey(argument.Name))
                     {
-                        RuntimeErrors.Throw($"Got multiple values for keyword argument '{argument.Name}'.");
+                        RuntimeErrors.Throw(
+                            $"Got multiple values for keyword argument '{argument.Name}'.",
+                            call.Span);
                     }
 
                     kwargs[argument.Name] = Evaluate(argument.Value, environment);
@@ -219,16 +226,16 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.Star:
                     if (seenKeyword)
                     {
-                        RuntimeErrors.Throw("*args argument follows keyword argument.");
+                        RuntimeErrors.Throw("*args argument follows keyword argument.", call.Span);
                     }
 
                     if (seenStarStar)
                     {
-                        RuntimeErrors.Throw("*args argument follows **kwargs argument.");
+                        RuntimeErrors.Throw("*args argument follows **kwargs argument.", call.Span);
                     }
 
                     seenStar = true;
-                    foreach (var item in EnumerateCallArgs(Evaluate(argument.Value, environment)))
+                    foreach (var item in EnumerateCallArgs(Evaluate(argument.Value, environment), call.Span))
                     {
                         args.Add(item);
                     }
@@ -236,15 +243,15 @@ public sealed class ExpressionEvaluator
                 case CallArgumentKind.StarStar:
                     if (seenStarStar)
                     {
-                        RuntimeErrors.Throw("Multiple **kwargs arguments are not allowed.");
+                        RuntimeErrors.Throw("Multiple **kwargs arguments are not allowed.", call.Span);
                     }
 
                     seenKeyword = true;
                     seenStarStar = true;
-                    MergeKwArgs(kwargs, Evaluate(argument.Value, environment));
+                    MergeKwArgs(kwargs, Evaluate(argument.Value, environment), call.Span);
                     break;
                 default:
-                    RuntimeErrors.Throw("Unsupported call argument.");
+                    RuntimeErrors.Throw("Unsupported call argument.", call.Span);
                     break;
             }
         }
@@ -332,35 +339,38 @@ public sealed class ExpressionEvaluator
         var target = Evaluate(index.Target, environment);
         return index.Index switch
         {
-            IndexValue value => EvaluateIndexValue(target, value, environment),
-            SliceIndex slice => EvaluateSlice(target, slice, environment),
-            _ => RuntimeErrors.Fail<StarlarkValue>("Unsupported index specifier.")
+            IndexValue value => EvaluateIndexValue(target, value, environment, index.Span),
+            SliceIndex slice => EvaluateSlice(target, slice, environment, index.Span),
+            _ => RuntimeErrors.Fail<StarlarkValue>("Unsupported index specifier.", index.Span)
         };
     }
 
     private StarlarkValue EvaluateIndexValue(
         StarlarkValue target,
         IndexValue value,
-        StarlarkEnvironment environment)
+        StarlarkEnvironment environment,
+        SourceSpan span)
     {
         var key = Evaluate(value.Value, environment);
 
         return target switch
         {
-            StarlarkList list => IndexList(list, key),
-            StarlarkTuple tuple => IndexTuple(tuple, key),
-            StarlarkString text => IndexString(text, key),
-            StarlarkBytes bytes => IndexBytes(bytes, key),
-            StarlarkDict dict => IndexDict(dict, key),
+            StarlarkList list => IndexList(list, key, span),
+            StarlarkTuple tuple => IndexTuple(tuple, key, span),
+            StarlarkString text => IndexString(text, key, span),
+            StarlarkBytes bytes => IndexBytes(bytes, key, span),
+            StarlarkDict dict => IndexDict(dict, key, span),
             _ => RuntimeErrors.Fail<StarlarkValue>(
-                $"Indexing not supported for type '{target.TypeName}'.")
+                $"Indexing not supported for type '{target.TypeName}'.",
+                span)
         };
     }
 
     private StarlarkValue EvaluateSlice(
         StarlarkValue target,
         SliceIndex slice,
-        StarlarkEnvironment environment)
+        StarlarkEnvironment environment,
+        SourceSpan span)
     {
         var start = EvaluateOptional(slice.Start, environment);
         var stop = EvaluateOptional(slice.Stop, environment);
@@ -368,12 +378,13 @@ public sealed class ExpressionEvaluator
 
         return target switch
         {
-            StarlarkList list => SliceList(list, start, stop, step),
-            StarlarkTuple tuple => SliceTuple(tuple, start, stop, step),
-            StarlarkString text => SliceString(text, start, stop, step),
-            StarlarkBytes bytes => SliceBytes(bytes, start, stop, step),
+            StarlarkList list => SliceList(list, start, stop, step, span),
+            StarlarkTuple tuple => SliceTuple(tuple, start, stop, step, span),
+            StarlarkString text => SliceString(text, start, stop, step, span),
+            StarlarkBytes bytes => SliceBytes(bytes, start, stop, step, span),
             _ => RuntimeErrors.Fail<StarlarkValue>(
-                $"Slicing not supported for type '{target.TypeName}'.")
+                $"Slicing not supported for type '{target.TypeName}'.",
+                span)
         };
     }
 
@@ -390,16 +401,19 @@ public sealed class ExpressionEvaluator
             return intValue;
         }
 
-        return RuntimeErrors.Fail<StarlarkInt>($"Slice indices must be int, got '{value.TypeName}'.");
+        return RuntimeErrors.Fail<StarlarkInt>(
+            $"Slice indices must be int, got '{value.TypeName}'.",
+            expression.Span);
     }
 
     private static StarlarkValue SliceList(
         StarlarkList list,
         StarlarkInt? start,
         StarlarkInt? stop,
-        StarlarkInt? step)
+        StarlarkInt? step,
+        SourceSpan span)
     {
-        var (from, to, stride) = NormalizeSlice(list.Items.Count, start, stop, step);
+        var (from, to, stride) = NormalizeSlice(list.Items.Count, start, stop, step, span);
         var result = new List<StarlarkValue>();
         if (stride > 0)
         {
@@ -423,9 +437,10 @@ public sealed class ExpressionEvaluator
         StarlarkTuple tuple,
         StarlarkInt? start,
         StarlarkInt? stop,
-        StarlarkInt? step)
+        StarlarkInt? step,
+        SourceSpan span)
     {
-        var (from, to, stride) = NormalizeSlice(tuple.Items.Count, start, stop, step);
+        var (from, to, stride) = NormalizeSlice(tuple.Items.Count, start, stop, step, span);
         var result = new List<StarlarkValue>();
         if (stride > 0)
         {
@@ -449,9 +464,10 @@ public sealed class ExpressionEvaluator
         StarlarkString text,
         StarlarkInt? start,
         StarlarkInt? stop,
-        StarlarkInt? step)
+        StarlarkInt? step,
+        SourceSpan span)
     {
-        var (from, to, stride) = NormalizeSlice(text.Value.Length, start, stop, step);
+        var (from, to, stride) = NormalizeSlice(text.Value.Length, start, stop, step, span);
         var builder = new System.Text.StringBuilder();
         if (stride > 0)
         {
@@ -475,9 +491,10 @@ public sealed class ExpressionEvaluator
         StarlarkBytes bytes,
         StarlarkInt? start,
         StarlarkInt? stop,
-        StarlarkInt? step)
+        StarlarkInt? step,
+        SourceSpan span)
     {
-        var (from, to, stride) = NormalizeSlice(bytes.Bytes.Length, start, stop, step);
+        var (from, to, stride) = NormalizeSlice(bytes.Bytes.Length, start, stop, step, span);
         var result = new List<byte>();
         if (stride > 0)
         {
@@ -501,12 +518,13 @@ public sealed class ExpressionEvaluator
         int length,
         StarlarkInt? start,
         StarlarkInt? stop,
-        StarlarkInt? step)
+        StarlarkInt? step,
+        SourceSpan span)
     {
         var stride = step?.Value ?? 1;
         if (stride == 0)
         {
-            RuntimeErrors.Throw("Slice step cannot be zero.");
+            RuntimeErrors.Throw("Slice step cannot be zero.", span);
         }
 
         var stepValue = checked((int)stride);
@@ -565,35 +583,35 @@ public sealed class ExpressionEvaluator
         return index;
     }
 
-    private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index)
+    private static StarlarkValue IndexList(StarlarkList list, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, list.Items.Count);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, list.Items.Count, span);
         return list.Items[resolved];
     }
 
-    private static StarlarkValue IndexTuple(StarlarkTuple tuple, StarlarkValue index)
+    private static StarlarkValue IndexTuple(StarlarkTuple tuple, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, tuple.Items.Count);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, tuple.Items.Count, span);
         return tuple.Items[resolved];
     }
 
-    private static StarlarkValue IndexString(StarlarkString text, StarlarkValue index)
+    private static StarlarkValue IndexString(StarlarkString text, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, text.Value.Length);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, text.Value.Length, span);
         return new StarlarkString(text.Value[resolved].ToString());
     }
 
-    private static StarlarkValue IndexBytes(StarlarkBytes bytes, StarlarkValue index)
+    private static StarlarkValue IndexBytes(StarlarkBytes bytes, StarlarkValue index, SourceSpan span)
     {
-        var position = RequireIndex(index);
-        var resolved = ResolveIndex(position, bytes.Bytes.Length);
+        var position = RequireIndex(index, span);
+        var resolved = ResolveIndex(position, bytes.Bytes.Length, span);
         return new StarlarkInt(bytes.Bytes[resolved]);
     }
 
-    private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key)
+    private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key, SourceSpan span)
     {
         StarlarkHash.EnsureHashable(key);
         foreach (var entry in dict.Entries)
@@ -604,26 +622,26 @@ public sealed class ExpressionEvaluator
             }
         }
 
-        RuntimeErrors.Throw("Key not found in dict.");
+        RuntimeErrors.Throw("Key not found in dict.", span);
         return StarlarkNone.Instance;
     }
 
-    private static int RequireIndex(StarlarkValue index)
+    private static int RequireIndex(StarlarkValue index, SourceSpan span)
     {
         if (index is StarlarkInt intValue)
         {
             return checked((int)intValue.Value);
         }
 
-        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.");
+        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.", span);
     }
 
-    private static int ResolveIndex(int position, int length)
+    private static int ResolveIndex(int position, int length, SourceSpan span)
     {
         var resolved = position < 0 ? length + position : position;
         if (resolved < 0 || resolved >= length)
         {
-            return RuntimeErrors.Fail<int>("Index out of range.");
+            return RuntimeErrors.Fail<int>("Index out of range.", span);
         }
 
         return resolved;
@@ -1391,11 +1409,11 @@ public sealed class ExpressionEvaluator
             case ComprehensionClauseKind.For:
                 if (clause.Target == null || clause.Iterable == null)
                 {
-                    RuntimeErrors.Throw("Invalid comprehension for-clause.");
+                    RuntimeErrors.Throw("Invalid comprehension for-clause.", clause.Span);
                 }
 
                 var iterable = Evaluate(clause.Iterable, environment);
-                foreach (var item in EnumerateComprehension(iterable))
+                foreach (var item in EnumerateComprehension(iterable, clause.Span))
                 {
                     AssignTarget(clause.Target, item, environment);
                     EvaluateComprehensionClause(clauses, index + 1, environment, emit);
@@ -1404,7 +1422,7 @@ public sealed class ExpressionEvaluator
             case ComprehensionClauseKind.If:
                 if (clause.Condition == null)
                 {
-                    RuntimeErrors.Throw("Invalid comprehension if-clause.");
+                    RuntimeErrors.Throw("Invalid comprehension if-clause.", clause.Span);
                 }
 
                 var condition = Evaluate(clause.Condition, environment);
@@ -1414,12 +1432,12 @@ public sealed class ExpressionEvaluator
                 }
                 break;
             default:
-                RuntimeErrors.Throw("Unsupported comprehension clause.");
+                RuntimeErrors.Throw("Unsupported comprehension clause.", clause.Span);
                 break;
         }
     }
 
-    private static IEnumerable<StarlarkValue> EnumerateComprehension(StarlarkValue value)
+    private static IEnumerable<StarlarkValue> EnumerateComprehension(StarlarkValue value, SourceSpan span)
     {
         switch (value)
         {
@@ -1439,7 +1457,8 @@ public sealed class ExpressionEvaluator
                 return EnumerateRange(range);
             default:
                 return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
-                    $"Type '{value.TypeName}' is not iterable.");
+                    $"Type '{value.TypeName}' is not iterable.",
+                    span);
         }
     }
 
@@ -1554,7 +1573,7 @@ public sealed class ExpressionEvaluator
         dict.MarkMutated();
     }
 
-    private static IEnumerable<StarlarkValue> EnumerateCallArgs(StarlarkValue value)
+    private static IEnumerable<StarlarkValue> EnumerateCallArgs(StarlarkValue value, SourceSpan span)
     {
         switch (value)
         {
@@ -1572,7 +1591,8 @@ public sealed class ExpressionEvaluator
                 return elems.Enumerate();
             default:
                 return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
-                    $"Object of type '{value.TypeName}' is not iterable.");
+                    $"Object of type '{value.TypeName}' is not iterable.",
+                    span);
         }
     }
 
@@ -1596,12 +1616,13 @@ public sealed class ExpressionEvaluator
 
     private static void MergeKwArgs(
         IDictionary<string, StarlarkValue> kwargs,
-        StarlarkValue value)
+        StarlarkValue value,
+        SourceSpan span)
     {
         var dict = value as StarlarkDict;
         if (dict == null)
         {
-            RuntimeErrors.Throw("**kwargs requires a dict.");
+            RuntimeErrors.Throw("**kwargs requires a dict.", span);
         }
 
         foreach (var entry in dict.Entries)
@@ -1609,12 +1630,12 @@ public sealed class ExpressionEvaluator
             var key = entry.Key as StarlarkString;
             if (key == null)
             {
-                RuntimeErrors.Throw("**kwargs keys must be strings.");
+                RuntimeErrors.Throw("**kwargs keys must be strings.", span);
             }
 
             if (kwargs.ContainsKey(key.Value))
             {
-                RuntimeErrors.Throw($"Got multiple values for keyword argument '{key.Value}'.");
+                RuntimeErrors.Throw($"Got multiple values for keyword argument '{key.Value}'.", span);
             }
 
             kwargs[key.Value] = entry.Value;

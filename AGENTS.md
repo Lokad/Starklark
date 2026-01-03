@@ -28,5 +28,5 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 
 ## CLI demo
 
-- REPL: `dotnet run --project tools/Lokad.Starlark.Cli --framework net8.0 -- repl`
-- Run a script: `dotnet run --project tools/Lokad.Starlark.Cli --framework net8.0 -- run path\to\script.star`
+- REPL: `dotnet run --project tools/Lokad.Starlark.Cli -- repl`
+- Run a script: `dotnet run --project tools/Lokad.Starlark.Cli -- run path\to\script.star`
