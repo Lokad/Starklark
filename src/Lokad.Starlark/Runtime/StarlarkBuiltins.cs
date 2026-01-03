@@ -127,6 +127,11 @@ public static class StarlarkBuiltins
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
         ExpectNoKeywords(kwargs);
+        if (args.Count == 0)
+        {
+            return new StarlarkBool(false);
+        }
+
         ExpectArgCount(args, 1);
         return new StarlarkBool(args[0].IsTruthy);
     }
@@ -304,6 +309,11 @@ public static class StarlarkBuiltins
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
     {
         ExpectNoKeywords(kwargs);
+        if (args.Count == 0)
+        {
+            return new StarlarkFloat(0.0);
+        }
+
         ExpectArgCount(args, 1);
         var value = args[0];
         return value switch

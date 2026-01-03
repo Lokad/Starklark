@@ -28,6 +28,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 15:05Z) Added bytes literals/builtin plus missing string methods with conformance coverage.
 - [x] (2026-01-03 15:30Z) Corrected raw bytes conformance expectation for `br` literals.
 - [x] (2026-01-03 16:00Z) Added hash builtin, whitespace-aware string splitting, and missing string methods (`index`, `rindex`, `isalnum`, `isalpha`, `isdigit`, `removeprefix`, `removesuffix`) plus updated conformance coverage.
+- [x] (2026-01-03 16:15Z) Added zero-argument `bool()`/`float()` behavior and conformance coverage for the builtins subset.
 
 ## Spec Compliance Checklist
 

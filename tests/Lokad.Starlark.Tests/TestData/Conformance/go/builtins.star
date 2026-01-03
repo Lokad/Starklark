@@ -3,6 +3,9 @@
 assert_eq(len([1, 2, 3]), 3)
 assert_eq(len("abc"), 3)
 ---
+assert_eq(bool(), False)
+assert_eq(float(), 0.0)
+---
 assert_eq(list(range(3)), [0, 1, 2])
 assert_eq(list(range(1, 4)), [1, 2, 3])
 assert_eq(list(range(1, 6, 2)), [1, 3, 5])
