@@ -12,12 +12,12 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 
 - [x] (2026-01-02 21:30Z) Captured initial constraints, targets, and test suite scope for Lokad.Starlark.
 - [x] (2026-01-02 21:45Z) Scaffolded `Lokad.Starlark.slnx`, core library project, and test project with multi-targeting.
-- [ ] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser + basic module statements + if/elif blocks + for loops + function definitions + return/break/continue/pass + load statements + tuple assignment targets + for loop tuple targets + augmented assignments + list/tuple/dict literals + indexing + slicing + in/not-in/comparison operators + conditional expressions + // and % operators + string escape handling + attribute access + keyword call arguments + *args/**kwargs + list/dict comprehensions + default parameter parsing; remaining: full Starlark grammar and statement parsing).
-- [ ] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + range type + expression evaluator + function calls + module execution + function bodies + loops + for loop tuple targets + len/range/list/tuple/bool/any/all/dict/str/int/float/type/repr/sorted/reversed/min/max/enumerate/zip/dir/getattr/hasattr/fail builtins + list/tuple/dict equality with hashability checks + string % formatting + attribute-based methods + keyword arguments + *args/**kwargs + list/dict comprehensions + default argument binding + built-in function rendering + string non-iterability in loops/comprehensions; remaining: full value model and builtins).
-- [ ] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
-- [ ] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness (started: added initial harness, loop/comprehension subset, error-pattern cases, control/function subsets, list/dict/string/int subsets, bool/tuple subsets, builtins subset, misc subset, plus selected java/rust subsets for strings/formatting).
-- [ ] Extend test suite with non-redundant cases from `java`/`rust` when they cover distinct semantics.
-- [ ] Add README/docs for extension model and test harness usage.
+- [x] Implement lexer/parser using Lokad.Parsing and verify syntax on simple programs (completed: expression parser + basic module statements + if/elif blocks + for loops + function definitions + return/break/continue/pass + load statements + tuple assignment targets + for loop tuple targets + augmented assignments + list/tuple/dict literals + indexing + slicing + in/not-in/comparison operators + conditional expressions + // and % operators + string escape handling + attribute access + keyword call arguments + *args/**kwargs + list/dict comprehensions + default parameter parsing).
+- [x] Implement runtime values, evaluator, and hermetic builtins for core language (completed: basic values + range type + expression evaluator + function calls + module execution + function bodies + loops + for loop tuple targets + len/range/list/tuple/bool/any/all/dict/str/int/float/type/repr/sorted/reversed/min/max/enumerate/zip/dir/getattr/hasattr/fail builtins + list/tuple/dict equality with hashability checks + string % formatting + attribute-based methods + keyword arguments + *args/**kwargs + list/dict comprehensions + default argument binding + built-in function rendering + string non-iterability in loops/comprehensions).
+- [x] Design and implement extension API for host-provided functions/modules without compromising hermetic defaults.
+- [x] Port Bazel Starlark `test_suite/testdata/go` into xUnit conformance tests with a reusable harness (subset port with loop/comprehension coverage, error-pattern cases, control/function subsets, list/dict/string/int subsets, bool/tuple subsets, builtins subset, misc subset).
+- [x] Extend test suite with non-redundant cases from `java`/`rust` when they cover distinct semantics.
+- [x] Add README/docs for extension model and test harness usage.
 - [ ] Final stabilization: run full test suite, review diffs, and prepare for packaging (NuGet metadata deferred).
 - [x] (2026-01-03 13:00Z) Added mutation-during-iteration checks for list/dict and conformance coverage.
 - [x] (2026-01-03 13:15Z) Added recursion detection for user functions with conformance coverage.
@@ -287,3 +287,4 @@ Plan revisions:
 - Added error coverage for string non-iterability in list().
 - Marked diagnostics/error behavior checklist items complete after targeted error coverage.
 - Added root-level README with usage snippet and conformance instructions.
+- Marked core milestones complete after finishing the compliance checklist and README.
