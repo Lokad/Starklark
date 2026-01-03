@@ -43,9 +43,22 @@ public sealed class StarlarkInt : StarlarkValue, IEquatable<StarlarkInt>
 
     public bool Equals(StarlarkInt? other) => other != null && Value == other.Value;
 
-    public override bool Equals(object? obj) => obj is StarlarkInt other && Equals(other);
+    public override bool Equals(object? obj)
+    {
+        if (obj is StarlarkInt other)
+        {
+            return Equals(other);
+        }
 
-    public override int GetHashCode() => Value.GetHashCode();
+        if (obj is StarlarkFloat floatValue)
+        {
+            return StarlarkNumber.EqualIntFloat(Value, floatValue.Value);
+        }
+
+        return false;
+    }
+
+    public override int GetHashCode() => StarlarkNumber.HashInt(Value);
 }
 
 public sealed class StarlarkFloat : StarlarkValue, IEquatable<StarlarkFloat>
@@ -60,11 +73,25 @@ public sealed class StarlarkFloat : StarlarkValue, IEquatable<StarlarkFloat>
     public override string TypeName => "float";
     public override bool IsTruthy => Value != 0.0;
 
-    public bool Equals(StarlarkFloat? other) => other != null && Value.Equals(other.Value);
+    public bool Equals(StarlarkFloat? other) =>
+        other != null && StarlarkNumber.EqualFloatFloat(Value, other.Value);
 
-    public override bool Equals(object? obj) => obj is StarlarkFloat other && Equals(other);
+    public override bool Equals(object? obj)
+    {
+        if (obj is StarlarkFloat other)
+        {
+            return StarlarkNumber.EqualFloatFloat(Value, other.Value);
+        }
 
-    public override int GetHashCode() => Value.GetHashCode();
+        if (obj is StarlarkInt intValue)
+        {
+            return StarlarkNumber.EqualIntFloat(intValue.Value, Value);
+        }
+
+        return false;
+    }
+
+    public override int GetHashCode() => StarlarkNumber.HashFloat(Value);
 }
 
 public sealed class StarlarkString : StarlarkValue, IEquatable<StarlarkString>

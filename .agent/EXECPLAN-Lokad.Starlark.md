@@ -22,6 +22,7 @@ The goal is to deliver an open-source Starlark interpreter in .NET named Lokad.S
 - [x] (2026-01-03 13:00Z) Added mutation-during-iteration checks for list/dict and conformance coverage.
 - [x] (2026-01-03 13:15Z) Added recursion detection for user functions with conformance coverage.
 - [x] (2026-01-03 13:25Z) Added boolean ordering comparisons with conformance coverage.
+- [x] (2026-01-03 13:40Z) Aligned numeric equality, hashing, and comparisons for int/float mix.
 
 ## Spec Compliance Checklist
 
@@ -250,3 +251,4 @@ Plan revisions:
 - Added mutation-during-iteration enforcement with conformance coverage.
 - Added recursion detection for Starlark user functions with conformance coverage.
 - Added boolean ordering comparisons with conformance coverage.
+- Aligned numeric equality, hashing, and comparisons for mixed int/float values.

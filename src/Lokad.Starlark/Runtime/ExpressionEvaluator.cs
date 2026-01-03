@@ -102,14 +102,14 @@ public sealed class ExpressionEvaluator
             BinaryOperator.Divide => Divide(leftValue, rightValue),
             BinaryOperator.FloorDivide => FloorDivide(leftValue, rightValue),
             BinaryOperator.Modulo => Modulo(leftValue, rightValue),
-            BinaryOperator.Equal => new StarlarkBool(Equals(leftValue, rightValue)),
-            BinaryOperator.NotEqual => new StarlarkBool(!Equals(leftValue, rightValue)),
+            BinaryOperator.Equal => new StarlarkBool(AreEqual(leftValue, rightValue)),
+            BinaryOperator.NotEqual => new StarlarkBool(!AreEqual(leftValue, rightValue)),
             BinaryOperator.In => new StarlarkBool(IsIn(leftValue, rightValue)),
             BinaryOperator.NotIn => new StarlarkBool(!IsIn(leftValue, rightValue)),
-            BinaryOperator.Less => new StarlarkBool(Compare(leftValue, rightValue) < 0),
-            BinaryOperator.LessEqual => new StarlarkBool(Compare(leftValue, rightValue) <= 0),
-            BinaryOperator.Greater => new StarlarkBool(Compare(leftValue, rightValue) > 0),
-            BinaryOperator.GreaterEqual => new StarlarkBool(Compare(leftValue, rightValue) >= 0),
+            BinaryOperator.Less => new StarlarkBool(CompareRelational(leftValue, rightValue, RelationalOperator.Less)),
+            BinaryOperator.LessEqual => new StarlarkBool(CompareRelational(leftValue, rightValue, RelationalOperator.LessEqual)),
+            BinaryOperator.Greater => new StarlarkBool(CompareRelational(leftValue, rightValue, RelationalOperator.Greater)),
+            BinaryOperator.GreaterEqual => new StarlarkBool(CompareRelational(leftValue, rightValue, RelationalOperator.GreaterEqual)),
             _ => throw new ArgumentOutOfRangeException(nameof(binary.Operator), binary.Operator, null)
         };
     }
@@ -608,14 +608,69 @@ public sealed class ExpressionEvaluator
         return false;
     }
 
-    private static int Compare(StarlarkValue left, StarlarkValue right)
+    private enum RelationalOperator
     {
-        if (TryGetNumber(left, out var leftNumber, out _)
-            && TryGetNumber(right, out var rightNumber, out _))
+        Less,
+        LessEqual,
+        Greater,
+        GreaterEqual
+    }
+
+    private static bool AreEqual(StarlarkValue left, StarlarkValue right)
+    {
+        if (TryGetNumber(left, out _, out _) && TryGetNumber(right, out _, out _))
         {
-            return leftNumber.CompareTo(rightNumber);
+            return EqualNumbers(left, right);
         }
 
+        return Equals(left, right);
+    }
+
+    private static bool EqualNumbers(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return leftInt.Value == rightInt.Value;
+        }
+
+        if (left is StarlarkFloat leftFloat && right is StarlarkFloat rightFloat)
+        {
+            return StarlarkNumber.EqualFloatFloat(leftFloat.Value, rightFloat.Value);
+        }
+
+        if (left is StarlarkInt leftNumber && right is StarlarkFloat rightNumber)
+        {
+            return StarlarkNumber.EqualIntFloat(leftNumber.Value, rightNumber.Value);
+        }
+
+        if (left is StarlarkFloat leftFloatNumber && right is StarlarkInt rightIntNumber)
+        {
+            return StarlarkNumber.EqualIntFloat(rightIntNumber.Value, leftFloatNumber.Value);
+        }
+
+        return false;
+    }
+
+    private static bool CompareRelational(StarlarkValue left, StarlarkValue right, RelationalOperator op)
+    {
+        if (TryGetNumber(left, out _, out _) && TryGetNumber(right, out _, out _))
+        {
+            return CompareNumbers(left, right, op);
+        }
+
+        var compare = CompareNonNumeric(left, right);
+        return op switch
+        {
+            RelationalOperator.Less => compare < 0,
+            RelationalOperator.LessEqual => compare <= 0,
+            RelationalOperator.Greater => compare > 0,
+            RelationalOperator.GreaterEqual => compare >= 0,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
+    }
+
+    private static int CompareNonNumeric(StarlarkValue left, StarlarkValue right)
+    {
         if (left is StarlarkString leftString && right is StarlarkString rightString)
         {
             return string.Compare(leftString.Value, rightString.Value, StringComparison.Ordinal);
@@ -628,6 +683,79 @@ public sealed class ExpressionEvaluator
 
         throw new InvalidOperationException(
             $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static bool CompareNumbers(StarlarkValue left, StarlarkValue right, RelationalOperator op)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return CompareLong(leftInt.Value, rightInt.Value, op);
+        }
+
+        if (left is StarlarkFloat leftFloat && right is StarlarkFloat rightFloat)
+        {
+            if (double.IsNaN(leftFloat.Value) || double.IsNaN(rightFloat.Value))
+            {
+                return false;
+            }
+
+            return op switch
+            {
+                RelationalOperator.Less => leftFloat.Value < rightFloat.Value,
+                RelationalOperator.LessEqual => leftFloat.Value <= rightFloat.Value,
+                RelationalOperator.Greater => leftFloat.Value > rightFloat.Value,
+                RelationalOperator.GreaterEqual => leftFloat.Value >= rightFloat.Value,
+                _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+            };
+        }
+
+        if (left is StarlarkInt leftNumber && right is StarlarkFloat rightNumber)
+        {
+            if (double.IsNaN(rightNumber.Value))
+            {
+                return false;
+            }
+
+            var compare = StarlarkNumber.CompareIntFloat(leftNumber.Value, rightNumber.Value);
+            return CompareFromSign(compare, op);
+        }
+
+        if (left is StarlarkFloat leftFloatNumber && right is StarlarkInt rightIntNumber)
+        {
+            if (double.IsNaN(leftFloatNumber.Value))
+            {
+                return false;
+            }
+
+            var compare = StarlarkNumber.CompareFloatInt(leftFloatNumber.Value, rightIntNumber.Value);
+            return CompareFromSign(compare, op);
+        }
+
+        return false;
+    }
+
+    private static bool CompareLong(long left, long right, RelationalOperator op)
+    {
+        return op switch
+        {
+            RelationalOperator.Less => left < right,
+            RelationalOperator.LessEqual => left <= right,
+            RelationalOperator.Greater => left > right,
+            RelationalOperator.GreaterEqual => left >= right,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
+    }
+
+    private static bool CompareFromSign(int compare, RelationalOperator op)
+    {
+        return op switch
+        {
+            RelationalOperator.Less => compare < 0,
+            RelationalOperator.LessEqual => compare <= 0,
+            RelationalOperator.Greater => compare > 0,
+            RelationalOperator.GreaterEqual => compare >= 0,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
     }
 
     private static StarlarkValue Add(StarlarkValue left, StarlarkValue right)

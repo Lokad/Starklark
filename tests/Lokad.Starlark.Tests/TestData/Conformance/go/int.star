@@ -19,5 +19,12 @@ assert_(2 > 1)
 assert_(2 >= 2)
 assert_(1 <= 1)
 ---
+assert_(1 == 1.0)
+assert_(1.0 == 1)
+assert_(1 < 2.0)
+assert_(2.0 > 1)
+assert_(1.0 <= 1)
+assert_(2.0 >= 2)
+---
 assert_eq(int("123"), 123)
 assert_eq(int("-123"), -123)
