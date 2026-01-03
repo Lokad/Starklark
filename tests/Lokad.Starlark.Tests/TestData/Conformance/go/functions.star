@@ -14,3 +14,9 @@ assert_eq(sq(x), 1)
 assert_eq(sq(x), 4)
 assert_eq(sq(x), 9)
 assert_eq(sq(x), 16)
+---
+def fib(x):
+  if x < 2:
+    return x
+  return fib(x - 2) + fib(x - 1)
+fib(10) ### (called recursively)

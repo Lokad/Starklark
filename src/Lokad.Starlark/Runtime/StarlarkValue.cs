@@ -479,6 +479,14 @@ public sealed class StarlarkUserFunction : StarlarkCallable
         }
 
         var evaluator = new ModuleEvaluator();
-        return evaluator.ExecuteFunctionBody(Body, callEnvironment);
+        callEnvironment.EnterFunctionCall(this);
+        try
+        {
+            return evaluator.ExecuteFunctionBody(Body, callEnvironment);
+        }
+        finally
+        {
+            callEnvironment.ExitFunctionCall();
+        }
     }
 }
