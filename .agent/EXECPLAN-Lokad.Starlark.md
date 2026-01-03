@@ -281,3 +281,4 @@ Plan revisions:
 - Updated compliance checklist/progress after adding numeric literal parsing and load restrictions.
 - Updated conformance coverage for `%` formatting and `str.format` edge cases.
 - Added function-local binding diagnostics for reference-before-assignment cases.
+- Added conformance coverage for list comprehension scoping.

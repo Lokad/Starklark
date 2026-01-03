@@ -32,3 +32,19 @@ assert_eq(items, [1, 2, 3, 4])
 letters = ["b", "a", "n", "a", "n", "a", "s"]
 assert_eq(letters.index("a"), 1)
 letters.index("z") ### (Value not found in list)
+---
+assert_eq([2 * x for x in [1, 2, 3]], [2, 4, 6])
+assert_eq([x for x in {"a": 1, "b": 2}], ["a", "b"])
+assert_eq([(y, x) for x, y in {1: 2, 3: 4}.items()], [(2, 1), (4, 3)])
+---
+a = [1, 2]
+b = [a for a in [3, 4]]
+assert_eq(a, [1, 2])
+assert_eq(b, [3, 4])
+---
+def listcompblock():
+  c = [1, 2]
+  d = [c for c in [3, 4]]
+  assert_eq(c, [1, 2])
+  assert_eq(d, [3, 4])
+listcompblock()
