@@ -608,12 +608,9 @@ public sealed class ExpressionEvaluator
     private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key, SourceSpan span)
     {
         StarlarkHash.EnsureHashable(key);
-        foreach (var entry in dict.Entries)
+        if (dict.TryGetValue(key, out var value))
         {
-            if (Equals(entry.Key, key))
-            {
-                return entry.Value;
-            }
+            return value;
         }
 
         RuntimeErrors.Throw("Key not found in dict.", span);
@@ -665,7 +662,7 @@ public sealed class ExpressionEvaluator
     private static bool IsInDict(StarlarkValue item, StarlarkDict dict)
     {
         StarlarkHash.EnsureHashable(item);
-        return dict.Entries.Any(entry => Equals(entry.Key, item));
+        return dict.ContainsKey(item);
     }
 
     private static bool IsInSet(StarlarkValue item, StarlarkSet set)
@@ -1061,19 +1058,7 @@ public sealed class ExpressionEvaluator
     private static void AssignDictIndex(StarlarkDict dict, StarlarkValue key, StarlarkValue value)
     {
         StarlarkHash.EnsureHashable(key);
-        for (var i = 0; i < dict.Entries.Count; i++)
-        {
-            var entry = dict.Entries[i];
-            if (Equals(entry.Key, key))
-            {
-                dict.Entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(entry.Key, value);
-                dict.MarkMutated();
-                return;
-            }
-        }
-
-        dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
-        dict.MarkMutated();
+        dict.SetValue(key, value);
     }
 
     private static IEnumerable<StarlarkValue> EnumerateCallArgs(StarlarkValue value, SourceSpan span)

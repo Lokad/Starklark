@@ -853,15 +853,9 @@ public static class StarlarkMethods
         var dict = (StarlarkDict)target;
         var key = args[0];
         StarlarkHash.EnsureHashable(key);
-        foreach (var entry in dict.Entries)
-        {
-            if (Equals(entry.Key, key))
-            {
-                return entry.Value;
-            }
-        }
-
-        return args.Count == 2 ? args[1] : StarlarkNone.Instance;
+        return dict.TryGetValue(key, out var value)
+            ? value
+            : args.Count == 2 ? args[1] : StarlarkNone.Instance;
     }
     private static StarlarkValue DictKeys(
         StarlarkValue target,
@@ -925,15 +919,9 @@ public static class StarlarkMethods
         var dict = (StarlarkDict)target;
         var key = args[0];
         StarlarkHash.EnsureHashable(key);
-        for (var i = 0; i < dict.Entries.Count; i++)
+        if (dict.RemoveKey(key, out var value))
         {
-            if (Equals(dict.Entries[i].Key, key))
-            {
-                var value = dict.Entries[i].Value;
-                dict.Entries.RemoveAt(i);
-                dict.MarkMutated();
-                return value;
-            }
+            return value;
         }
 
         if (args.Count == 2)
@@ -969,8 +957,7 @@ public static class StarlarkMethods
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 0, "clear");
         var dict = (StarlarkDict)target;
-        dict.Entries.Clear();
-        dict.MarkMutated();
+        dict.ClearEntries();
         return StarlarkNone.Instance;
     }
     private static StarlarkValue DictSetDefault(
@@ -987,17 +974,13 @@ public static class StarlarkMethods
         var dict = (StarlarkDict)target;
         var key = args[0];
         StarlarkHash.EnsureHashable(key);
-        for (var i = 0; i < dict.Entries.Count; i++)
+        if (dict.TryGetValue(key, out var existing))
         {
-            if (Equals(dict.Entries[i].Key, key))
-            {
-                return dict.Entries[i].Value;
-            }
+            return existing;
         }
 
         var value = args.Count == 2 ? args[1] : StarlarkNone.Instance;
-        dict.Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
-        dict.MarkMutated();
+        dict.SetValue(key, value);
         return value;
     }
     private static StarlarkValue DictUpdate(
@@ -1011,14 +994,13 @@ public static class StarlarkMethods
         }
 
         var dict = (StarlarkDict)target;
-        var mutated = false;
         if (args.Count == 1)
         {
             if (args[0] is StarlarkDict other)
             {
                 foreach (var entry in other.Entries)
                 {
-                    mutated |= AddOrReplace(dict.Entries, entry.Key, entry.Value);
+                    dict.SetValue(entry.Key, entry.Value);
                 }
             }
             else
@@ -1031,7 +1013,7 @@ public static class StarlarkMethods
                     }
 
                     StarlarkHash.EnsureHashable(key);
-                    mutated |= AddOrReplace(dict.Entries, key, value);
+                    dict.SetValue(key, value);
                 }
             }
         }
@@ -1039,12 +1021,7 @@ public static class StarlarkMethods
         foreach (var pair in kwargs)
         {
             var key = new StarlarkString(pair.Key);
-            mutated |= AddOrReplace(dict.Entries, key, pair.Value);
-        }
-
-        if (mutated)
-        {
-            dict.MarkMutated();
+            dict.SetValue(key, pair.Value);
         }
         return StarlarkNone.Instance;
     }
@@ -1070,11 +1047,7 @@ public static class StarlarkMethods
         ExpectNoKeywords(kwargs);
         ExpectArgCount(args, 0, "clear");
         var set = (StarlarkSet)target;
-        if (set.Items.Count > 0)
-        {
-            set.Items.Clear();
-            set.MarkMutated();
-        }
+        set.ClearItems();
 
         return StarlarkNone.Instance;
     }
@@ -1928,24 +1901,6 @@ public static class StarlarkMethods
         key = StarlarkNone.Instance;
         value = StarlarkNone.Instance;
         return false;
-    }
-
-    private static bool AddOrReplace(
-        List<KeyValuePair<StarlarkValue, StarlarkValue>> entries,
-        StarlarkValue key,
-        StarlarkValue value)
-    {
-        for (var i = 0; i < entries.Count; i++)
-        {
-            if (Equals(entries[i].Key, key))
-            {
-                entries[i] = new KeyValuePair<StarlarkValue, StarlarkValue>(key, value);
-                return true;
-            }
-        }
-
-        entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
-        return true;
     }
 
     private static List<StarlarkValue> CollectUniqueHashable(StarlarkValue value)

@@ -624,12 +624,9 @@ public static class StarlarkFormatting
             }
 
             var lookupKey = new StarlarkString(key);
-            foreach (var entry in _mapping.Entries)
+            if (_mapping.TryGetValue(lookupKey, out var value))
             {
-                if (Equals(entry.Key, lookupKey))
-                {
-                    return entry.Value;
-                }
+                return value;
             }
 
             throw new KeyNotFoundException($"Key '{key}' not found in format mapping.");

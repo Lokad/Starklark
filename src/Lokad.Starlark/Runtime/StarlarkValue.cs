@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Lokad.Starlark.Runtime;
 
@@ -229,15 +228,103 @@ public sealed class StarlarkTuple : StarlarkValue
 
 public sealed class StarlarkDict : StarlarkValue
 {
+    private readonly Dictionary<StarlarkValue, int> _index = new Dictionary<StarlarkValue, int>();
+    private bool _indexDirty = true;
+
     public StarlarkDict(IEnumerable<KeyValuePair<StarlarkValue, StarlarkValue>> entries)
     {
         Entries = new List<KeyValuePair<StarlarkValue, StarlarkValue>>(entries);
+        EnsureIndex();
     }
 
     public List<KeyValuePair<StarlarkValue, StarlarkValue>> Entries { get; }
     internal int Version { get; private set; }
 
-    internal void MarkMutated() => Version++;
+    internal void MarkMutated()
+    {
+        Version++;
+        _indexDirty = true;
+    }
+
+    internal bool TryGetValue(StarlarkValue key, out StarlarkValue value)
+    {
+        EnsureIndex();
+        if (_index.TryGetValue(key, out var index))
+        {
+            value = Entries[index].Value;
+            return true;
+        }
+
+        value = StarlarkNone.Instance;
+        return false;
+    }
+
+    internal bool ContainsKey(StarlarkValue key)
+    {
+        EnsureIndex();
+        return _index.ContainsKey(key);
+    }
+
+    internal void SetValue(StarlarkValue key, StarlarkValue value)
+    {
+        EnsureIndex();
+        if (_index.TryGetValue(key, out var index))
+        {
+            Entries[index] = new KeyValuePair<StarlarkValue, StarlarkValue>(Entries[index].Key, value);
+        }
+        else
+        {
+            Entries.Add(new KeyValuePair<StarlarkValue, StarlarkValue>(key, value));
+        }
+
+        MarkMutated();
+    }
+
+    internal bool RemoveKey(StarlarkValue key, out StarlarkValue value)
+    {
+        EnsureIndex();
+        if (!_index.TryGetValue(key, out var index))
+        {
+            value = StarlarkNone.Instance;
+            return false;
+        }
+
+        value = Entries[index].Value;
+        Entries.RemoveAt(index);
+        MarkMutated();
+        return true;
+    }
+
+    internal void ClearEntries()
+    {
+        if (Entries.Count == 0)
+        {
+            return;
+        }
+
+        Entries.Clear();
+        MarkMutated();
+    }
+
+    private void EnsureIndex()
+    {
+        if (!_indexDirty)
+        {
+            return;
+        }
+
+        _index.Clear();
+        for (var i = 0; i < Entries.Count; i++)
+        {
+            var key = Entries[i].Key;
+            if (!_index.ContainsKey(key))
+            {
+                _index[key] = i;
+            }
+        }
+
+        _indexDirty = false;
+    }
 
     internal IEnumerable<StarlarkValue> EnumerateWithMutationCheck()
     {
@@ -269,15 +356,23 @@ public sealed class StarlarkDict : StarlarkValue
 
 public sealed class StarlarkSet : StarlarkValue
 {
+    private readonly Dictionary<StarlarkValue, int> _index = new Dictionary<StarlarkValue, int>();
+    private bool _indexDirty = true;
+
     public StarlarkSet(IEnumerable<StarlarkValue> items)
     {
         Items = new List<StarlarkValue>(items);
+        EnsureIndex();
     }
 
     public List<StarlarkValue> Items { get; }
     internal int Version { get; private set; }
 
-    internal void MarkMutated() => Version++;
+    internal void MarkMutated()
+    {
+        Version++;
+        _indexDirty = true;
+    }
 
     internal IEnumerable<StarlarkValue> EnumerateWithMutationCheck()
     {
@@ -298,20 +393,14 @@ public sealed class StarlarkSet : StarlarkValue
 
     public bool Contains(StarlarkValue value)
     {
-        for (var i = 0; i < Items.Count; i++)
-        {
-            if (StarlarkEquality.AreEqual(Items[i], value))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        EnsureIndex();
+        return _index.ContainsKey(value);
     }
 
     public bool AddValue(StarlarkValue value)
     {
-        if (Contains(value))
+        EnsureIndex();
+        if (_index.ContainsKey(value))
         {
             return false;
         }
@@ -323,17 +412,46 @@ public sealed class StarlarkSet : StarlarkValue
 
     public bool RemoveValue(StarlarkValue value)
     {
+        EnsureIndex();
+        if (!_index.TryGetValue(value, out var index))
+        {
+            return false;
+        }
+
+        Items.RemoveAt(index);
+        MarkMutated();
+        return true;
+    }
+
+    internal void ClearItems()
+    {
+        if (Items.Count == 0)
+        {
+            return;
+        }
+
+        Items.Clear();
+        MarkMutated();
+    }
+
+    private void EnsureIndex()
+    {
+        if (!_indexDirty)
+        {
+            return;
+        }
+
+        _index.Clear();
         for (var i = 0; i < Items.Count; i++)
         {
-            if (StarlarkEquality.AreEqual(Items[i], value))
+            var item = Items[i];
+            if (!_index.ContainsKey(item))
             {
-                Items.RemoveAt(i);
-                MarkMutated();
-                return true;
+                _index[item] = i;
             }
         }
 
-        return false;
+        _indexDirty = false;
     }
 
     public override bool Equals(object? obj)
@@ -531,11 +649,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
                             $"Function '{Name}' got an unexpected keyword argument '{pair.Key}'.");
                     }
 
-                    kwArgsDict.Entries.Add(
-                        new KeyValuePair<StarlarkValue, StarlarkValue>(
-                            new StarlarkString(pair.Key),
-                            pair.Value));
-                    kwArgsDict.MarkMutated();
+                    kwArgsDict.SetValue(new StarlarkString(pair.Key), pair.Value);
                     continue;
                 }
 
