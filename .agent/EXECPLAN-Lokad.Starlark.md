@@ -38,7 +38,7 @@ Core Semantics:
 - Implement boolean ordering comparisons (`False < True`, etc.) per spec ordering rules. (done)
 - Enforce mutation-during-iteration restrictions for list/dict (and comprehensions) where required. (done)
 - Implement recursion detection (dynamic call stack) consistent with Starlark rules. (done)
-- Align hashing, equality, and type ordering to spec (including cross-type comparison restrictions).
+- Align hashing, equality, and type ordering to spec (including cross-type comparison restrictions). (done)
 
 Builtins & Methods:
 - Complete core builtins per spec (including `len`, `range`, `type`, `repr`, `bool`, `list`, `tuple`, `dict`, `sorted`, `reversed`, `min`, `max`, `enumerate`, `zip`, `any`, `all`, `dir`, `getattr`, `hasattr`, `fail`).
