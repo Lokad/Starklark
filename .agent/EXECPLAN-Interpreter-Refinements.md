@@ -29,7 +29,10 @@ The goal is to make the Starlark runtime easier to integrate and more reliable b
 
 ## Outcomes & Retrospective
 
-Not started yet. This section will summarize what changed and any gaps or lessons when milestones complete.
+- Outcome: Introduced span-aware runtime errors and consolidated arithmetic/bitwise operator logic between evaluators.
+- Outcome: Added indexed lookup for dict/set with lazy rebuilds, plus shared argument validation helper for builtins/methods.
+- Outcome: Implemented optional execution guards (step budget + cancellation) wired through interpreter and environment.
+- Validation: `dotnet build` and `dotnet test` succeeded (215 tests on net8.0 and net10.0).
 
 ## Context and Orientation
 
