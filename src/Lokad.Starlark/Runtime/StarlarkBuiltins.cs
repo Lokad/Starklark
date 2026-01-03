@@ -31,6 +31,7 @@ public static class StarlarkBuiltins
         environment.AddFunction("dir", Dir, isBuiltin: true);
         environment.AddFunction("getattr", GetAttr, isBuiltin: true);
         environment.AddFunction("hasattr", HasAttr, isBuiltin: true);
+        environment.AddFunction("hash", Hash, isBuiltin: true);
         environment.AddFunction("fail", Fail, isBuiltin: true);
     }
 
@@ -582,6 +583,21 @@ public static class StarlarkBuiltins
         }
     }
 
+    private static StarlarkValue Hash(
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1);
+        var value = args[0];
+        return value switch
+        {
+            StarlarkString text => new StarlarkInt(HashString(text.Value)),
+            StarlarkBytes bytes => new StarlarkInt(HashBytes(bytes.Bytes)),
+            _ => throw new InvalidOperationException("hash expects a string or bytes.")
+        };
+    }
+
     private static StarlarkValue Fail(
         IReadOnlyList<StarlarkValue> args,
         IReadOnlyDictionary<string, StarlarkValue> kwargs)
@@ -784,6 +800,10 @@ public static class StarlarkBuiltins
                 "endswith",
                 "find",
                 "format",
+                "index",
+                "isalnum",
+                "isalpha",
+                "isdigit",
                 "islower",
                 "isspace",
                 "istitle",
@@ -791,8 +811,11 @@ public static class StarlarkBuiltins
                 "join",
                 "lower",
                 "partition",
+                "removeprefix",
+                "removesuffix",
                 "replace",
                 "rfind",
+                "rindex",
                 "rpartition",
                 "rsplit",
                 "split",
@@ -898,6 +921,31 @@ public static class StarlarkBuiltins
         }
 
         return left.Length.CompareTo(right.Length);
+    }
+
+    private static int HashString(string value)
+    {
+        var hash = 0;
+        for (var i = 0; i < value.Length; i++)
+        {
+            hash = unchecked(hash * 31 + value[i]);
+        }
+
+        return hash;
+    }
+
+    private static int HashBytes(byte[] bytes)
+    {
+        const uint offsetBasis = 2166136261;
+        const uint prime = 16777619;
+        var hash = offsetBasis;
+        for (var i = 0; i < bytes.Length; i++)
+        {
+            hash ^= bytes[i];
+            hash *= prime;
+        }
+
+        return unchecked((int)hash);
     }
 
     private static IEnumerable<StarlarkValue> EnumerateDictKeys(StarlarkDict dict)

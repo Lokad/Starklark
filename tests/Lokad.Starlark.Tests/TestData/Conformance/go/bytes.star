@@ -16,3 +16,5 @@ assert_eq(bytes([65, 66, 67]), b"ABC")
 bytes(256) ### (string, bytes, or iterable)
 ---
 assert_eq(list(b"ABC".elems()), [65, 66, 67])
+---
+assert_eq(hash(b"ABC"), 1552166763)

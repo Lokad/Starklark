@@ -31,3 +31,28 @@ assert_(not "".isspace())
 ---
 assert_eq("a".join("ctmrn".elems()), "catamaran")
 assert_eq(list("abc".elems()), ["a", "b", "c"])
+---
+assert_eq("bonbon".index("on"), 1)
+assert_eq("bonbon".index("on", 2), 4)
+"bonbon".index("on", 2, 5) ### (substring not found)
+assert_eq("bonbon".rindex("on"), 4)
+assert_eq("bonbon".rindex("on", None, 5), 1)
+---
+assert_("base64".isalnum())
+assert_(not "Catch-22".isalnum())
+assert_("ABC".isalpha())
+assert_(not "123".isalpha())
+assert_("123".isdigit())
+assert_(not "1.23".isdigit())
+---
+assert_eq("banana".removeprefix("ban"), "ana")
+assert_eq("banana".removesuffix("ana"), "ban")
+---
+assert_eq(" a bc\n  def \t  ghi".split(), ["a", "bc", "def", "ghi"])
+assert_eq(" a bc\n  def \t  ghi".split(None, 1), ["a", "bc\n  def \t  ghi"])
+assert_eq(" a bc\n  def \t  ghi".rsplit(None, 1), [" a bc\n  def", "ghi"])
+---
+assert_eq("A\nB\rC\r\nD".splitlines(), ["A", "B", "C", "D"])
+assert_eq("one\n\ntwo".splitlines(True), ["one\n", "\n", "two"])
+---
+assert_eq(hash("abc"), 96354)

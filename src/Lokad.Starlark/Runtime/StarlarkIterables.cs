@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 
 namespace Lokad.Starlark.Runtime;
 
@@ -17,10 +16,9 @@ public sealed class StarlarkStringElems : StarlarkValue
 
     public IEnumerable<StarlarkValue> Enumerate()
     {
-        var bytes = Encoding.UTF8.GetBytes(Value);
-        foreach (var item in bytes)
+        for (var i = 0; i < Value.Length; i++)
         {
-            yield return new StarlarkString(Encoding.Latin1.GetString(new[] { item }));
+            yield return new StarlarkString(Value[i].ToString());
         }
     }
 }

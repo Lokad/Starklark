@@ -37,6 +37,8 @@ public static class StarlarkMethods
             "replace" => new StarlarkBoundMethod(name, target, StringReplace),
             "find" => new StarlarkBoundMethod(name, target, StringFind),
             "rfind" => new StarlarkBoundMethod(name, target, StringRFind),
+            "index" => new StarlarkBoundMethod(name, target, StringIndex),
+            "rindex" => new StarlarkBoundMethod(name, target, StringRIndex),
             "partition" => new StarlarkBoundMethod(name, target, StringPartition),
             "rpartition" => new StarlarkBoundMethod(name, target, StringRPartition),
             "join" => new StarlarkBoundMethod(name, target, StringJoin),
@@ -44,10 +46,15 @@ public static class StarlarkMethods
             "upper" => new StarlarkBoundMethod(name, target, StringUpper),
             "title" => new StarlarkBoundMethod(name, target, StringTitle),
             "capitalize" => new StarlarkBoundMethod(name, target, StringCapitalize),
+            "isalnum" => new StarlarkBoundMethod(name, target, StringIsAlnum),
+            "isalpha" => new StarlarkBoundMethod(name, target, StringIsAlpha),
+            "isdigit" => new StarlarkBoundMethod(name, target, StringIsDigit),
             "islower" => new StarlarkBoundMethod(name, target, StringIsLower),
             "isupper" => new StarlarkBoundMethod(name, target, StringIsUpper),
             "istitle" => new StarlarkBoundMethod(name, target, StringIsTitle),
             "isspace" => new StarlarkBoundMethod(name, target, StringIsSpace),
+            "removeprefix" => new StarlarkBoundMethod(name, target, StringRemovePrefix),
+            "removesuffix" => new StarlarkBoundMethod(name, target, StringRemoveSuffix),
             "elems" => new StarlarkBoundMethod(name, target, StringElems),
             "format" => new StarlarkBoundMethod(name, target, StringFormat),
             _ => throw new InvalidOperationException(
@@ -106,19 +113,16 @@ public static class StarlarkMethods
     {
         ExpectNoKeywords(kwargs);
         var text = ((StarlarkString)target).Value;
-        if (args.Count == 0)
-        {
-            throw new InvalidOperationException("split requires a separator.");
-        }
-
         if (args.Count > 2)
         {
-            throw new InvalidOperationException("split expects 1 or 2 arguments.");
+            throw new InvalidOperationException("split expects 0 to 2 arguments.");
         }
 
-        var separator = RequireString(args[0]);
-        var maxsplit = args.Count == 2 ? RequireInt(args[1]) : -1;
-        return new StarlarkList(SplitWithSeparator(text, separator, (int)maxsplit, fromRight: false));
+        var (separator, maxsplit, hasSeparator) = ResolveSplitArguments(args);
+        return new StarlarkList(
+            hasSeparator
+                ? SplitWithSeparator(text, separator!, (int)maxsplit, fromRight: false)
+                : SplitOnWhitespace(text, (int)maxsplit, fromRight: false));
     }
     private static StarlarkValue StringRSplit(
         StarlarkValue target,
@@ -127,19 +131,16 @@ public static class StarlarkMethods
     {
         ExpectNoKeywords(kwargs);
         var text = ((StarlarkString)target).Value;
-        if (args.Count == 0)
-        {
-            throw new InvalidOperationException("rsplit requires a separator.");
-        }
-
         if (args.Count > 2)
         {
-            throw new InvalidOperationException("rsplit expects 1 or 2 arguments.");
+            throw new InvalidOperationException("rsplit expects 0 to 2 arguments.");
         }
 
-        var separator = RequireString(args[0]);
-        var maxsplit = args.Count == 2 ? RequireInt(args[1]) : -1;
-        return new StarlarkList(SplitWithSeparator(text, separator, (int)maxsplit, fromRight: true));
+        var (separator, maxsplit, hasSeparator) = ResolveSplitArguments(args);
+        return new StarlarkList(
+            hasSeparator
+                ? SplitWithSeparator(text, separator!, (int)maxsplit, fromRight: true)
+                : SplitOnWhitespace(text, (int)maxsplit, fromRight: true));
     }
     private static StarlarkValue StringSplitLines(
         StarlarkValue target,
@@ -152,25 +153,39 @@ public static class StarlarkMethods
             throw new InvalidOperationException("splitlines expects 0 or 1 arguments.");
         }
 
-        var keepEnds = args.Count == 1 && RequireBool(args[0]);
+        var keepEnds = args.Count == 1 && args[0].IsTruthy;
         var text = ((StarlarkString)target).Value;
         var result = new List<StarlarkValue>();
 
         var start = 0;
-        for (var i = 0; i < text.Length; i++)
+        var index = 0;
+        while (index < text.Length)
         {
-            if (text[i] == '\n')
+            var terminatorLength = 0;
+            if (text[index] == '\n')
             {
-                var line = keepEnds ? text.Substring(start, i - start + 1) : text.Substring(start, i - start);
-                result.Add(new StarlarkString(line));
-                start = i + 1;
+                terminatorLength = 1;
             }
+            else if (text[index] == '\r')
+            {
+                terminatorLength = index + 1 < text.Length && text[index + 1] == '\n' ? 2 : 1;
+            }
+
+            if (terminatorLength == 0)
+            {
+                index++;
+                continue;
+            }
+
+            var lineEnd = index + (keepEnds ? terminatorLength : 0);
+            result.Add(new StarlarkString(text.Substring(start, lineEnd - start)));
+            index += terminatorLength;
+            start = index;
         }
 
         if (start < text.Length)
         {
-            var line = keepEnds ? text[start..] : text[start..];
-            result.Add(new StarlarkString(line));
+            result.Add(new StarlarkString(text.Substring(start)));
         }
 
         return new StarlarkList(result);
@@ -294,6 +309,32 @@ public static class StarlarkMethods
     {
         return StringFindCore(target, args, kwargs, fromRight: true);
     }
+    private static StarlarkValue StringIndex(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        var index = FindSubstringIndex(((StarlarkString)target).Value, args, kwargs, fromRight: false, "index");
+        if (index < 0)
+        {
+            throw new InvalidOperationException("substring not found.");
+        }
+
+        return new StarlarkInt(index);
+    }
+    private static StarlarkValue StringRIndex(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        var index = FindSubstringIndex(((StarlarkString)target).Value, args, kwargs, fromRight: true, "rindex");
+        if (index < 0)
+        {
+            throw new InvalidOperationException("substring not found.");
+        }
+
+        return new StarlarkInt(index);
+    }
     private static StarlarkValue StringPartition(
         StarlarkValue target,
         IReadOnlyList<StarlarkValue> args,
@@ -374,6 +415,75 @@ public static class StarlarkMethods
         var first = text.Substring(0, consumed).ToUpperInvariant();
         var rest = text.Substring(consumed).ToLowerInvariant();
         return new StarlarkString(first + rest);
+    }
+    private static StarlarkValue StringIsAlnum(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "isalnum");
+        var text = ((StarlarkString)target).Value;
+        if (text.Length == 0)
+        {
+            return new StarlarkBool(false);
+        }
+
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (!System.Text.Rune.IsLetterOrDigit(rune))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
+    }
+    private static StarlarkValue StringIsAlpha(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "isalpha");
+        var text = ((StarlarkString)target).Value;
+        if (text.Length == 0)
+        {
+            return new StarlarkBool(false);
+        }
+
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (!System.Text.Rune.IsLetter(rune))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
+    }
+    private static StarlarkValue StringIsDigit(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 0, "isdigit");
+        var text = ((StarlarkString)target).Value;
+        if (text.Length == 0)
+        {
+            return new StarlarkBool(false);
+        }
+
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (!System.Text.Rune.IsDigit(rune))
+            {
+                return new StarlarkBool(false);
+            }
+        }
+
+        return new StarlarkBool(true);
     }
     private static StarlarkValue StringIsLower(
         StarlarkValue target,
@@ -484,6 +594,38 @@ public static class StarlarkMethods
         }
 
         return new StarlarkBool(true);
+    }
+    private static StarlarkValue StringRemovePrefix(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "removeprefix");
+        var text = ((StarlarkString)target).Value;
+        var prefix = RequireString(args[0]);
+        if (text.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return new StarlarkString(text.Substring(prefix.Length));
+        }
+
+        return new StarlarkString(text);
+    }
+    private static StarlarkValue StringRemoveSuffix(
+        StarlarkValue target,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs)
+    {
+        ExpectNoKeywords(kwargs);
+        ExpectArgCount(args, 1, "removesuffix");
+        var text = ((StarlarkString)target).Value;
+        var suffix = RequireString(args[0]);
+        if (text.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            return new StarlarkString(text.Substring(0, text.Length - suffix.Length));
+        }
+
+        return new StarlarkString(text);
     }
     private static StarlarkValue StringElems(
         StarlarkValue target,
@@ -910,19 +1052,34 @@ public static class StarlarkMethods
         IReadOnlyDictionary<string, StarlarkValue> kwargs,
         bool fromRight)
     {
+        var text = ((StarlarkString)target).Value;
+        var index = FindSubstringIndex(text, args, kwargs, fromRight, fromRight ? "rfind" : "find");
+        return new StarlarkInt(index);
+    }
+
+    private static int FindSubstringIndex(
+        string text,
+        IReadOnlyList<StarlarkValue> args,
+        IReadOnlyDictionary<string, StarlarkValue> kwargs,
+        bool fromRight,
+        string methodName)
+    {
         ExpectNoKeywords(kwargs);
         if (args.Count is < 1 or > 3)
         {
-            throw new InvalidOperationException("find expects 1 to 3 arguments.");
+            throw new InvalidOperationException($"{methodName} expects 1 to 3 arguments.");
         }
 
-        var text = ((StarlarkString)target).Value;
         var needle = RequireString(args[0]);
         var (start, end) = ResolveStartEnd(text.Length, args, 1);
-        var index = fromRight
+        if (end <= start)
+        {
+            return -1;
+        }
+
+        return fromRight
             ? text.LastIndexOf(needle, end - 1, end - start, StringComparison.Ordinal)
             : text.IndexOf(needle, start, end - start, StringComparison.Ordinal);
-        return new StarlarkInt(index);
     }
 
     private static StarlarkValue PartitionCore(
@@ -1161,6 +1318,155 @@ public static class StarlarkMethods
         return rightParts;
     }
 
+    private static (string? Separator, long MaxSplit, bool HasSeparator) ResolveSplitArguments(
+        IReadOnlyList<StarlarkValue> args)
+    {
+        if (args.Count == 0)
+        {
+            return (null, -1, false);
+        }
+
+        if (args[0] is StarlarkNone)
+        {
+            var maxsplit = args.Count == 2 ? RequireInt(args[1]) : -1;
+            return (null, maxsplit, false);
+        }
+
+        var separator = RequireString(args[0]);
+        var limit = args.Count == 2 ? RequireInt(args[1]) : -1;
+        return (separator, limit, true);
+    }
+
+    private static List<StarlarkValue> SplitOnWhitespace(
+        string text,
+        int maxsplit,
+        bool fromRight)
+    {
+        var parts = new List<StarlarkValue>();
+        if (fromRight)
+        {
+            var end = text.Length;
+            while (end > 0 && char.IsWhiteSpace(text[end - 1]))
+            {
+                end--;
+            }
+
+            if (end == 0)
+            {
+                return parts;
+            }
+
+            if (maxsplit == 0)
+            {
+                parts.Add(new StarlarkString(text.Substring(0, end)));
+                return parts;
+            }
+
+            var splits = 0;
+            var index = end - 1;
+            while (index >= 0)
+            {
+                if (char.IsWhiteSpace(text[index]))
+                {
+                    parts.Add(new StarlarkString(text.Substring(index + 1, end - index - 1)));
+                    splits++;
+                    if (maxsplit > 0 && splits >= maxsplit)
+                    {
+                        while (index >= 0 && char.IsWhiteSpace(text[index]))
+                        {
+                            index--;
+                        }
+
+                        if (index >= 0)
+                        {
+                            parts.Add(new StarlarkString(text.Substring(0, index + 1)));
+                        }
+
+                        parts.Reverse();
+                        return parts;
+                    }
+
+                    while (index >= 0 && char.IsWhiteSpace(text[index]))
+                    {
+                        index--;
+                    }
+
+                    end = index + 1;
+                    continue;
+                }
+
+                index--;
+            }
+
+            if (end > 0)
+            {
+                parts.Add(new StarlarkString(text.Substring(0, end)));
+            }
+
+            parts.Reverse();
+            return parts;
+        }
+
+        var start = 0;
+        while (start < text.Length && char.IsWhiteSpace(text[start]))
+        {
+            start++;
+        }
+
+        if (start >= text.Length)
+        {
+            return parts;
+        }
+
+        if (maxsplit == 0)
+        {
+            parts.Add(new StarlarkString(text.Substring(start)));
+            return parts;
+        }
+
+        var splitCount = 0;
+        var indexForward = start;
+        while (indexForward < text.Length)
+        {
+            if (char.IsWhiteSpace(text[indexForward]))
+            {
+                parts.Add(new StarlarkString(text.Substring(start, indexForward - start)));
+                splitCount++;
+                if (maxsplit > 0 && splitCount >= maxsplit)
+                {
+                    while (indexForward < text.Length && char.IsWhiteSpace(text[indexForward]))
+                    {
+                        indexForward++;
+                    }
+
+                    if (indexForward < text.Length)
+                    {
+                        parts.Add(new StarlarkString(text.Substring(indexForward)));
+                    }
+
+                    return parts;
+                }
+
+                while (indexForward < text.Length && char.IsWhiteSpace(text[indexForward]))
+                {
+                    indexForward++;
+                }
+
+                start = indexForward;
+                continue;
+            }
+
+            indexForward++;
+        }
+
+        if (start < text.Length)
+        {
+            parts.Add(new StarlarkString(text.Substring(start)));
+        }
+
+        return parts;
+    }
+
     private static List<string> ExpandStringOrTuple(StarlarkValue value)
     {
         if (value is StarlarkString text)
@@ -1288,8 +1594,8 @@ public static class StarlarkMethods
         IReadOnlyList<StarlarkValue> args,
         int offset)
     {
-        var startValue = offset < args.Count ? RequireInt(args[offset]) : 0;
-        var endValue = offset + 1 < args.Count ? RequireInt(args[offset + 1]) : length;
+        var startValue = GetOptionalIndex(args, offset, 0);
+        var endValue = GetOptionalIndex(args, offset + 1, length);
         var start = NormalizeIndex(length, startValue, clamp: true);
         var end = NormalizeIndex(length, endValue, clamp: true);
         if (end < start)
@@ -1298,6 +1604,27 @@ public static class StarlarkMethods
         }
 
         return (start, end);
+    }
+
+    private static long GetOptionalIndex(IReadOnlyList<StarlarkValue> args, int index, long fallback)
+    {
+        if (index >= args.Count)
+        {
+            return fallback;
+        }
+
+        var value = args[index];
+        if (value is StarlarkNone)
+        {
+            return fallback;
+        }
+
+        if (value is StarlarkInt intValue)
+        {
+            return intValue.Value;
+        }
+
+        throw new InvalidOperationException($"Expected int or None, got '{value.TypeName}'.");
     }
 
     private static int NormalizeInsertIndex(int length, long index)
