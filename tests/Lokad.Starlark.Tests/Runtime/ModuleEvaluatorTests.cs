@@ -45,6 +45,18 @@ public sealed class ModuleEvaluatorTests
     }
 
     [Fact]
+    public void RejectsGlobalReferencedBeforeAssignment()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var exception = Assert.Throws<StarlarkRuntimeException>(
+            () => interpreter.ExecuteModule("x = x\n", environment));
+
+        Assert.Equal("local variable 'x' referenced before assignment.", exception.Message);
+    }
+
+    [Fact]
     public void ExecutesIfStatement()
     {
         var interpreter = new StarlarkInterpreter();
@@ -66,6 +78,28 @@ public sealed class ModuleEvaluatorTests
 
         Assert.Equal(new StarlarkInt(6), environment.Globals["total"]);
         Assert.Equal(new StarlarkInt(6), result);
+    }
+
+    [Fact]
+    public void ExecutesRangeEquality()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("range(0, 1, 1) == range(0, 2, 2)\n", environment);
+
+        Assert.Equal(new StarlarkBool(true), result);
+    }
+
+    [Fact]
+    public void ExecutesEmptyRangeEquality()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("range(0) == range(1, 1)\n", environment);
+
+        Assert.Equal(new StarlarkBool(true), result);
     }
 
     [Fact]
@@ -302,6 +336,41 @@ public sealed class ModuleEvaluatorTests
             () => interpreter.ExecuteModule("\"%d %d\" % 1\n", environment));
         Assert.Throws<InvalidOperationException>(
             () => interpreter.ExecuteModule("\"%d %d\" % (1, 2, 3)\n", environment));
+    }
+
+    [Fact]
+    public void ExecutesSinglePercentFormattingArgument()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var result = interpreter.ExecuteModule("\"ab%scd\" % [1]\n", environment);
+
+        Assert.Equal(new StarlarkString("ab[1]cd"), result);
+    }
+
+    [Fact]
+    public void RejectsSplitLinesNonBool()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => interpreter.ExecuteModule("\"a\\n\".splitlines(1)\n", environment));
+
+        Assert.Equal("expected bool, got 'int'.", exception.Message);
+    }
+
+    [Fact]
+    public void RejectsMissingAttribute()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => interpreter.ExecuteModule("\"a\".missing\n", environment));
+
+        Assert.Equal("no field or method 'missing' for 'string'.", exception.Message);
     }
 
     [Fact]

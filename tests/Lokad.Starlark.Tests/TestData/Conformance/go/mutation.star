@@ -13,3 +13,10 @@ def mutate_dict():
     items[key] = items[key] + 1
 
 mutate_dict() ### (mutate an iterable for an iterator while iterating|Cannot mutate an iterable during iteration.)
+---
+def mutate_set():
+  values = set([1, 2, 3])
+  for value in values:
+    values.add(value + 10)
+
+mutate_set() ### (mutate an iterable for an iterator while iterating|Cannot mutate an iterable during iteration.)

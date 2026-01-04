@@ -27,6 +27,16 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void ParsesTrailingSemicolonStatement()
+    {
+        var module = StarlarkModuleParser.ParseModule("x = 1; y = 2;\n");
+
+        Assert.Equal(2, module.Statements.Count);
+        Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(module.Statements[0]));
+        Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(module.Statements[1]));
+    }
+
+    [Fact]
     public void ParsesTupleAssignment()
     {
         var module = StarlarkModuleParser.ParseModule("a, b = 1, 2\n");

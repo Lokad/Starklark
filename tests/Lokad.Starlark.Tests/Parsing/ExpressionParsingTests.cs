@@ -216,6 +216,17 @@ public sealed class ExpressionParsingTests
     }
 
     [Fact]
+    public void ParsesNotExpressionWithComparison()
+    {
+        var expr = StarlarkParser.ParseExpression("not 1 == 2");
+
+        var unary = Assert.IsType<UnaryExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Equal(UnaryOperator.Not, unary.Operator);
+        var comparison = Assert.IsType<BinaryExpression>(unary.Operand);
+        Assert.Equal(BinaryOperator.Equal, comparison.Operator);
+    }
+
+    [Fact]
     public void ParsesFloorDivideExpression()
     {
         var expr = StarlarkParser.ParseExpression("10 // 3");
