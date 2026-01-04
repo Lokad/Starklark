@@ -175,7 +175,7 @@ public sealed class StarlarkList : StarlarkValue
         {
             if (version != Version)
             {
-                throw new InvalidOperationException("Cannot mutate an iterable during iteration.");
+                throw new InvalidOperationException("mutate an iterable for an iterator while iterating");
             }
 
             yield return Items[i];
@@ -333,7 +333,7 @@ public sealed class StarlarkDict : StarlarkValue
         {
             if (version != Version)
             {
-                throw new InvalidOperationException("Cannot mutate an iterable during iteration.");
+                throw new InvalidOperationException("mutate an iterable for an iterator while iterating");
             }
 
             yield return Entries[i].Key;
@@ -381,7 +381,7 @@ public sealed class StarlarkSet : StarlarkValue
         {
             if (version != Version)
             {
-                throw new InvalidOperationException("Cannot mutate an iterable during iteration.");
+                throw new InvalidOperationException("mutate an iterable for an iterator while iterating");
             }
 
             yield return Items[i];

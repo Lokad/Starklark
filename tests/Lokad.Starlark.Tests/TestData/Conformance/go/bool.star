@@ -15,7 +15,7 @@ assert_eq(1 == 1, True)
 assert_eq(1 == 2, False)
 ---
 assert_eq(0 or "" or [] or 123, 123)
-0 or "" or [] or 0 or 1 // 0 ### (Division by zero)
+0 or "" or [] or 0 or 1 // 0 ### (division by zero|Division by zero)
 ---
 assert_eq(1 and "a" and [1] and 123, 123)
-1 and "a" and [1] and 123 and 1 // 0 ### (Division by zero)
+1 and "a" and [1] and 123 and 1 // 0 ### (division by zero|Division by zero)

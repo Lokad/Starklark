@@ -5,11 +5,11 @@ def mutate_list():
   for value in values:
     values.append(value)
 
-mutate_list() ### (Cannot mutate an iterable during iteration.)
+mutate_list() ### (mutate an iterable for an iterator while iterating|Cannot mutate an iterable during iteration.)
 ---
 def mutate_dict():
   items = {"a": 1, "b": 2}
   for key in items:
     items[key] = items[key] + 1
 
-mutate_dict() ### (Cannot mutate an iterable during iteration.)
+mutate_dict() ### (mutate an iterable for an iterator while iterating|Cannot mutate an iterable during iteration.)

@@ -527,7 +527,7 @@ public sealed class ExpressionEvaluator
         var stride = step?.Value ?? 1;
         if (stride == 0)
         {
-            RuntimeErrors.Throw("Slice step cannot be zero.", span);
+            RuntimeErrors.Throw("slice step cannot be zero", span);
         }
 
         var stepValue = checked((int)stride);

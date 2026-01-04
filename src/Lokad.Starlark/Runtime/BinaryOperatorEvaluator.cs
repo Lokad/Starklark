@@ -166,7 +166,7 @@ internal static class BinaryOperatorEvaluator
         {
             if (rightNumber == 0)
             {
-                RuntimeErrors.Throw("Division by zero.");
+                RuntimeErrors.Throw("division by zero");
             }
 
             return new StarlarkFloat(leftNumber / rightNumber);
@@ -182,7 +182,7 @@ internal static class BinaryOperatorEvaluator
         {
             if (rightInt.Value == 0)
             {
-                RuntimeErrors.Throw("Division by zero.");
+                RuntimeErrors.Throw("division by zero");
             }
 
             var quotient = leftInt.Value / rightInt.Value;
@@ -200,7 +200,7 @@ internal static class BinaryOperatorEvaluator
         {
             if (rightNumber == 0)
             {
-                RuntimeErrors.Throw("Division by zero.");
+                RuntimeErrors.Throw("division by zero");
             }
 
             return new StarlarkFloat(Math.Floor(leftNumber / rightNumber));
@@ -221,7 +221,7 @@ internal static class BinaryOperatorEvaluator
         {
             if (rightInt.Value == 0)
             {
-                RuntimeErrors.Throw("Division by zero.");
+                RuntimeErrors.Throw("division by zero");
             }
 
             var quotient = leftInt.Value / rightInt.Value;
@@ -240,7 +240,7 @@ internal static class BinaryOperatorEvaluator
         {
             if (rightNumber == 0)
             {
-                RuntimeErrors.Throw("Division by zero.");
+                RuntimeErrors.Throw("division by zero");
             }
 
             var quotient = Math.Floor(leftNumber / rightNumber);
