@@ -7,7 +7,7 @@ using Lokad.Starlark.Runtime;
 namespace Lokad.Starlark.Cli;
 
 [Command(Name = "lokad-starlark", Description = "Hermetic Starlark REPL and script runner.")]
-[Subcommand(typeof(ReplCommand), typeof(RunCommand))]
+[Subcommand(typeof(ReplCommand), typeof(RunCommand), typeof(ExecCommand))]
 [HelpOption("-?|-h|--help")]
 public sealed class StarlarkCli
 {
@@ -130,6 +130,41 @@ public sealed class RunCommand
         try
         {
             var value = interpreter.ExecuteModule(source, environment);
+            if (value != null && value is not StarlarkNone)
+            {
+                console.WriteLine(StarlarkFormatting.ToRepr(value));
+            }
+        }
+        catch (Exception ex)
+        {
+            console.Error.WriteLine(ex.Message);
+            return 1;
+        }
+
+        return 0;
+    }
+}
+
+[Command("exec", Description = "Run Starlark source provided inline.")]
+public sealed class ExecCommand
+{
+    [Argument(0, "source", "Inline Starlark source.")]
+    public string? Source { get; set; }
+
+    public int OnExecute(IConsole console)
+    {
+        if (string.IsNullOrWhiteSpace(Source))
+        {
+            console.Error.WriteLine("Missing source.");
+            return 1;
+        }
+
+        var interpreter = new StarlarkInterpreter();
+        var environment = CliEnvironment.CreateEnvironment(console);
+
+        try
+        {
+            var value = interpreter.ExecuteModule(Source, environment);
             if (value != null && value is not StarlarkNone)
             {
                 console.WriteLine(StarlarkFormatting.ToRepr(value));

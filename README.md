@@ -41,6 +41,7 @@ dotnet test --tl:off --nologo -v minimal
 ## CLI Demo
 
 The CLI is a local demo utility (not packaged in the NuGet) with two modes: a hermetic REPL and a script runner. It injects a `print` helper to demonstrate host extensibility.
+The `exec` command runs inline source for quick experiments and fuzzing.
 
 Start the REPL:
 
@@ -52,4 +53,10 @@ Run a script file:
 
 ```powershell
 dotnet run --project tools/Lokad.Starlark.Cli -- run path\to\script.star
+```
+
+Run inline source:
+
+```powershell
+dotnet run --project tools/Lokad.Starlark.Cli -- exec "print(1 + 2)"
 ```
