@@ -655,12 +655,15 @@ public sealed class ExpressionEvaluator
             StarlarkTuple tuple => BinaryOperatorEvaluator.ContainsValue(tuple.Items, item),
             StarlarkDict dict => IsInDict(item, dict),
             StarlarkSet set => IsInSet(item, set),
-            StarlarkString text when item is StarlarkString needle =>
-                text.Value.Contains(needle.Value, StringComparison.Ordinal),
-            StarlarkBytes bytes when item is StarlarkInt intValue =>
-                IsInBytes(intValue.Value, bytes.Bytes),
-            StarlarkBytes bytes when item is StarlarkBytes needle =>
-                ContainsBytes(bytes.Bytes, needle.Bytes),
+            StarlarkString text => item is StarlarkString needle
+                ? text.Value.Contains(needle.Value, StringComparison.Ordinal)
+                : RuntimeErrors.Fail<bool>("in string requires string as left operand."),
+            StarlarkBytes bytes => item switch
+            {
+                StarlarkInt intValue => IsInBytes(intValue.Value, bytes.Bytes),
+                StarlarkBytes needle => ContainsBytes(bytes.Bytes, needle.Bytes),
+                _ => RuntimeErrors.Fail<bool>("in bytes requires bytes or int as left operand.")
+            },
             StarlarkRange range when item is StarlarkInt intValue =>
                 IsInRange(intValue.Value, range),
             _ => RuntimeErrors.Fail<bool>(

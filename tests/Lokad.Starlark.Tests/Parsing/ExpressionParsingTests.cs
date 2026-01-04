@@ -236,6 +236,16 @@ public sealed class ExpressionParsingTests
     }
 
     [Fact]
+    public void ParsesNotWithComparison()
+    {
+        var expr = StarlarkParser.ParseExpression("not 1 >= 1");
+
+        var unary = Assert.IsType<UnaryExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Equal(UnaryOperator.Not, unary.Operator);
+        Assert.IsType<BinaryExpression>(unary.Operand);
+    }
+
+    [Fact]
     public void ParsesStringEscapes()
     {
         var expr = StarlarkParser.ParseExpression("\"a\\n\\t\"");

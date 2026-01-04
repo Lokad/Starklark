@@ -429,7 +429,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule(Rank = 1)]
     public Expression Unary(
-        [T(Token.Plus, Token.Minus, Token.Tilde, Token.Not)] Pos<string> op,
+        [T(Token.Plus, Token.Minus, Token.Tilde)] Pos<string> op,
         [NT(1)] Expression operand)
     {
         var unaryOperator = op.Value switch
@@ -437,7 +437,6 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             "+" => UnaryOperator.Positive,
             "-" => UnaryOperator.Negate,
             "~" => UnaryOperator.BitwiseNot,
-            "not" => UnaryOperator.Not,
             _ => throw new ArgumentOutOfRangeException(nameof(op), op.Value, null)
         };
 
@@ -496,6 +495,14 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             Operator = BinaryOperator.NotIn,
             Right = right
         };
+    }
+
+    [Rule(Rank = 3)]
+    public Expression NotExpression(
+        [T(Token.Not)] Pos<string> keyword,
+        [NT(3)] Expression operand)
+    {
+        return new UnaryExpression(UnaryOperator.Not, operand, SpanBetween(keyword.Location, operand.Span));
     }
 
     [Rule(Rank = 2)]
