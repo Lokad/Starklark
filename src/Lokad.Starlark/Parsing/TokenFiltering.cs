@@ -43,7 +43,7 @@ internal static class TokenFiltering
                     break;
             }
 
-            if (depth > 0 && token.Token == Token.Comma && IsTrailingComma(sourceTokens, i))
+            if (token.Token == Token.Comma && IsTrailingComma(sourceTokens, i, depth))
             {
                 filtered.Add(new LexerToken<Token>(Token.TrailingComma, token.Start, token.Length));
             }
@@ -56,7 +56,7 @@ internal static class TokenFiltering
         return new LexerResult<Token>(tokens.Buffer, filtered, tokens.Newlines, tokens.HasInvalidTokens);
     }
 
-    private static bool IsTrailingComma(IReadOnlyList<LexerToken<Token>> tokens, int index)
+    private static bool IsTrailingComma(IReadOnlyList<LexerToken<Token>> tokens, int index, int depth)
     {
         for (var i = index + 1; i < tokens.Count; i++)
         {
@@ -66,9 +66,14 @@ internal static class TokenFiltering
                 continue;
             }
 
-            return token == Token.CloseParen
-                || token == Token.CloseBracket
-                || token == Token.CloseBrace;
+            if (depth > 0)
+            {
+                return token == Token.CloseParen
+                    || token == Token.CloseBracket
+                    || token == Token.CloseBrace;
+            }
+
+            return token == Token.Colon;
         }
 
         return false;

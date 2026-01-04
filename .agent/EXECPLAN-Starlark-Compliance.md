@@ -12,8 +12,10 @@ The goal is to bring the hermetic Lokad.Starlark interpreter to full Starlark co
 
 - [x] (2026-01-03 22:30Z) Collected a preliminary gap inventory by running the upstream conformance suite locally and noting failure categories.
 - [x] (2026-01-03 22:36Z) Mirrored upstream testdata into a local `_fullsuite` folder and captured the baseline counts for the net10.0 run.
-- [ ] (2026-01-03 23:50Z) Parser now handles semicolons and trailing commas inside brackets via a `TrailingComma` token; single-item tuples parse again.
-- [ ] (2026-01-04 00:02Z) Scope lookup now distinguishes referenced-before-assignment and conformance `print` is stubbed to keep scope tests focused.
+- [x] (2026-01-03 23:50Z) Parser now handles semicolons and trailing commas inside brackets via a `TrailingComma` token; single-item tuples parse again.
+- [x] (2026-01-04 00:02Z) Scope lookup now distinguishes referenced-before-assignment and conformance `print` is stubbed to keep scope tests focused.
+- [ ] Add parser unit tests for semicolons and trailing commas introduced in the grammar updates.
+- [ ] Add runtime/conformance tests for referenced-before-assignment errors and the conformance `print` stub.
 - [ ] Close parser and syntax gaps that block spec tests (semicolons, trailing commas, slice parsing, call parsing).
 - [ ] Close runtime semantics gaps (scope rules, mutation detection, comparison and containment rules).
 - [ ] Close builtin behavior gaps (int parsing, sorted/min/max/reversed/range, string helpers).
@@ -139,3 +141,4 @@ Note on updates: when this plan changes, add a note at the bottom describing wha
 Plan update (2026-01-03): Marked the full-suite mirror/baseline milestone as complete and recorded the net10.0 pass/fail counts so future deltas are measurable.
 Plan update (2026-01-03): Added parser progress on trailing commas/semicolons and refreshed the net10.0 pass/fail counts after the grammar changes.
 Plan update (2026-01-04): Recorded scope-lookup/print tweaks and the updated net10.0 pass/fail totals.
+Plan update (2026-01-04): Added required test coverage tasks for the parser and scope/print changes.

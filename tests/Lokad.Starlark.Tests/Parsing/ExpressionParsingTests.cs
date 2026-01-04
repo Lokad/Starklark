@@ -56,9 +56,33 @@ public sealed class ExpressionParsingTests
     }
 
     [Fact]
+    public void ParsesListLiteralWithTrailingComma()
+    {
+        var expr = StarlarkParser.ParseExpression("[1, 2,]");
+
+        var list = Assert.IsType<ListExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Collection(
+            list.Items,
+            item => Assert.Equal(Lit(1L), item),
+            item => Assert.Equal(Lit(2L), item));
+    }
+
+    [Fact]
     public void ParsesTupleLiteral()
     {
         var expr = StarlarkParser.ParseExpression("(1, 2)");
+
+        var tuple = Assert.IsType<TupleExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Collection(
+            tuple.Items,
+            item => Assert.Equal(Lit(1L), item),
+            item => Assert.Equal(Lit(2L), item));
+    }
+
+    [Fact]
+    public void ParsesTupleLiteralWithTrailingComma()
+    {
+        var expr = StarlarkParser.ParseExpression("(1, 2,)");
 
         var tuple = Assert.IsType<TupleExpression>(SyntaxNormalization.Normalize(expr));
         Assert.Collection(
@@ -106,6 +130,39 @@ public sealed class ExpressionParsingTests
                 Assert.Equal(Lit("b"), entry.Key);
                 Assert.Equal(Lit(2L), entry.Value);
             });
+    }
+
+    [Fact]
+    public void ParsesDictLiteralWithTrailingComma()
+    {
+        var expr = StarlarkParser.ParseExpression("{\"a\": 1,}");
+
+        var dict = Assert.IsType<DictExpression>(SyntaxNormalization.Normalize(expr));
+        var entry = Assert.Single(dict.Entries);
+        Assert.Equal(Lit("a"), entry.Key);
+        Assert.Equal(Lit(1L), entry.Value);
+    }
+
+    [Fact]
+    public void ParsesCallWithTrailingComma()
+    {
+        var expr = StarlarkParser.ParseExpression("f(1, 2,)");
+
+        var call = Assert.IsType<CallExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Equal(Id("f"), call.Callee);
+        Assert.Collection(
+            call.Arguments,
+            arg => Assert.Equal(Lit(1L), arg.Value),
+            arg => Assert.Equal(Lit(2L), arg.Value));
+    }
+
+    [Fact]
+    public void ParsesLambdaWithTrailingComma()
+    {
+        var expr = StarlarkParser.ParseExpression("lambda a, b,: a + b");
+
+        var lambda = Assert.IsType<LambdaExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Equal(2, lambda.Parameters.Count);
     }
 
     [Fact]

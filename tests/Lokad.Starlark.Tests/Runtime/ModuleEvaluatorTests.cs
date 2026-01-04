@@ -21,6 +21,30 @@ public sealed class ModuleEvaluatorTests
     }
 
     [Fact]
+    public void RejectsReferencedBeforeAssignment()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var exception = Assert.Throws<StarlarkRuntimeException>(
+            () => interpreter.ExecuteModule("def f():\n  x = x\nf()\n", environment));
+
+        Assert.Equal("local variable 'x' referenced before assignment.", exception.Message);
+    }
+
+    [Fact]
+    public void RejectsUndefinedIdentifier()
+    {
+        var interpreter = new StarlarkInterpreter();
+        var environment = new StarlarkEnvironment();
+
+        var exception = Assert.Throws<StarlarkRuntimeException>(
+            () => interpreter.ExecuteModule("y\n", environment));
+
+        Assert.Equal("undefined identifier 'y'.", exception.Message);
+    }
+
+    [Fact]
     public void ExecutesIfStatement()
     {
         var interpreter = new StarlarkInterpreter();

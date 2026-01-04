@@ -23,3 +23,5 @@ assert_(any([0, "", 1]))
 assert_(not any([0, "", []]))
 assert_(all([1, "x", [0]]))
 assert_(not all([1, "", 2]))
+---
+assert_eq(print("hi"), None)

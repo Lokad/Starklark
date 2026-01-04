@@ -19,6 +19,14 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void ParsesSemicolonSeparatedStatements()
+    {
+        var module = StarlarkModuleParser.ParseModule("x = 1; y = 2\n");
+
+        Assert.Equal(2, module.Statements.Count);
+    }
+
+    [Fact]
     public void ParsesTupleAssignment()
     {
         var module = StarlarkModuleParser.ParseModule("a, b = 1, 2\n");
@@ -182,6 +190,16 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void ParsesFunctionDefinitionWithTrailingComma()
+    {
+        var module = StarlarkModuleParser.ParseModule("def add(a, b,):\n  return a + b\n");
+
+        var statement = Assert.Single(module.Statements);
+        var function = Assert.IsType<FunctionDefinitionStatement>(SyntaxNormalization.Normalize(statement));
+        Assert.Equal(2, function.Parameters.Count);
+    }
+
+    [Fact]
     public void ParsesListComprehension()
     {
         var module = StarlarkModuleParser.ParseModule("items = [x for x in [1, 2]]\n");
@@ -204,6 +222,18 @@ public sealed class ModuleParsingTests
         var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
         var comprehension = Assert.IsType<DictComprehensionExpression>(assignment.Value);
         Assert.Single(comprehension.Clauses);
+    }
+
+    [Fact]
+    public void ParsesLoadStatementWithTrailingComma()
+    {
+        var module = StarlarkModuleParser.ParseModule("load(\"math\", \"sin\",)\n");
+
+        var statement = Assert.Single(module.Statements);
+        var load = Assert.IsType<LoadStatement>(SyntaxNormalization.Normalize(statement));
+        Assert.Equal("math", load.Module);
+        var binding = Assert.Single(load.Bindings);
+        Assert.Equal("sin", binding.Name);
     }
 
     [Fact]
