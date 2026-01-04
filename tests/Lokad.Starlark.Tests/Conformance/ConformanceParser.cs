@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Lokad.Starlark.Tests.Conformance;
 
@@ -14,70 +16,55 @@ public static class ConformanceParser
     private static IReadOnlyList<ConformanceCase> ParseContent(string[] lines)
     {
         var cases = new List<ConformanceCase>();
-        var buffer = new List<string>();
-        string? expectedError = null;
+        var buffer = new StringBuilder();
+        var expectedErrors = new List<string>();
         var index = 1;
+        var errorRegex = new Regex("^(.*?) *### *((go|java|rust):)? *(.*)$");
+        const string impl = "go";
 
         void Flush()
         {
-            if (buffer.Count == 0)
+            if (buffer.Length == 0 && expectedErrors.Count == 0)
             {
-                expectedError = null;
+                expectedErrors.Clear();
                 return;
             }
 
-            var source = string.Join("\n", buffer);
+            var source = buffer.ToString();
+            var expectedError = expectedErrors.Count == 0 ? null : expectedErrors[0];
             cases.Add(new ConformanceCase($"case-{index}", source, expectedError));
             buffer.Clear();
-            expectedError = null;
+            expectedErrors.Clear();
             index++;
         }
 
         foreach (var line in lines)
         {
-            var trimmed = line.Trim();
-            if (trimmed == "---")
+            if (line == "---")
             {
                 Flush();
                 continue;
             }
 
-            if (trimmed.StartsWith("#", StringComparison.Ordinal))
+            var match = errorRegex.Match(line);
+            if (match.Success)
             {
+                var errorImpl = match.Groups[3].Value;
+                if ((string.IsNullOrEmpty(errorImpl) || errorImpl == impl) && expectedErrors.Count == 0)
+                {
+                    expectedErrors.Add(match.Groups[4].Value);
+                }
+
+                buffer.Append(match.Groups[1].Value);
+                buffer.Append('\n');
                 continue;
             }
 
-            var (code, pattern) = SplitExpected(line);
-            if (pattern != null)
-            {
-                expectedError = pattern;
-            }
-
-            if (!string.IsNullOrWhiteSpace(code))
-            {
-                buffer.Add(code);
-            }
+            buffer.Append(line);
+            buffer.Append('\n');
         }
 
         Flush();
         return cases;
-    }
-
-    private static (string Code, string? Pattern) SplitExpected(string line)
-    {
-        var index = line.IndexOf("###", StringComparison.Ordinal);
-        if (index < 0)
-        {
-            return (line, null);
-        }
-
-        var code = line[..index].TrimEnd();
-        var pattern = line[(index + 3)..].Trim();
-        if (pattern.StartsWith("(", StringComparison.Ordinal) && pattern.EndsWith(")", StringComparison.Ordinal))
-        {
-            pattern = pattern[1..^1].Trim();
-        }
-
-        return (code, pattern.Length == 0 ? null : pattern);
     }
 }

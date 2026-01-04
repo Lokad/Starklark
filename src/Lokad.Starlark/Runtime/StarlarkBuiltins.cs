@@ -288,7 +288,7 @@ public static class StarlarkBuiltins
         {
             if (baseProvided)
             {
-                throw new InvalidOperationException("int base is only valid for string arguments.");
+                throw new InvalidOperationException("non-string with explicit base.");
             }
 
             return intValue;
@@ -298,7 +298,7 @@ public static class StarlarkBuiltins
         {
             if (baseProvided)
             {
-                throw new InvalidOperationException("int base is only valid for string arguments.");
+                throw new InvalidOperationException("non-string with explicit base.");
             }
 
             return new StarlarkInt(boolValue.Value ? 1 : 0);
@@ -308,7 +308,7 @@ public static class StarlarkBuiltins
         {
             if (baseProvided)
             {
-                throw new InvalidOperationException("int base is only valid for string arguments.");
+                throw new InvalidOperationException("non-string with explicit base.");
             }
 
             return new StarlarkInt((long)floatValue.Value);
@@ -318,7 +318,12 @@ public static class StarlarkBuiltins
         {
             if (!TryParseInt(text.Value, baseValue, out var parsed))
             {
-                throw new InvalidOperationException($"Invalid int literal: '{text.Value}'.");
+                if (baseProvided)
+                {
+                    throw new InvalidOperationException("invalid literal for base.");
+                }
+
+                throw new InvalidOperationException($"invalid literal: '{text.Value}'.");
             }
 
             return new StarlarkInt(parsed);
@@ -470,7 +475,7 @@ public static class StarlarkBuiltins
         {
             StarlarkList list => new StarlarkList(list.Items.AsEnumerable().Reverse().ToList()),
             StarlarkTuple tuple => new StarlarkList(tuple.Items.Reverse().ToList()),
-            _ => throw new InvalidOperationException("reversed expects a list or tuple.")
+            _ => throw new InvalidOperationException($"got {args[0].TypeName}, want iterable.")
         };
     }
 
@@ -702,7 +707,7 @@ public static class StarlarkBuiltins
     {
         if (args.Count == 0)
         {
-            throw new InvalidOperationException($"{name} expects at least one argument.");
+            throw new InvalidOperationException($"{name} expects at least one positional argument.");
         }
 
         var keyFunction = ExtractKeyOnly(kwargs, name);
@@ -712,7 +717,7 @@ public static class StarlarkBuiltins
 
         if (values.Count == 0)
         {
-            throw new InvalidOperationException($"{name} expects at least one item.");
+            throw new InvalidOperationException($"{name} expected at least one item.");
         }
 
         var best = values[0];
@@ -798,8 +803,33 @@ public static class StarlarkBuiltins
             return leftBool.Value.CompareTo(rightBool.Value);
         }
 
+        if (left is StarlarkList leftList && right is StarlarkList rightList)
+        {
+            return CompareSequences(leftList.Items, rightList.Items);
+        }
+
+        if (left is StarlarkTuple leftTuple && right is StarlarkTuple rightTuple)
+        {
+            return CompareSequences(leftTuple.Items, rightTuple.Items);
+        }
+
         throw new InvalidOperationException(
-            $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
+            $"not implemented: comparison between '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static int CompareSequences(IReadOnlyList<StarlarkValue> left, IReadOnlyList<StarlarkValue> right)
+    {
+        var count = Math.Min(left.Count, right.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var compare = CompareValues(left[i], right[i]);
+            if (compare != 0)
+            {
+                return compare;
+            }
+        }
+
+        return left.Count.CompareTo(right.Count);
     }
 
     private static bool TryGetNumber(StarlarkValue value, out double number, out bool isInt)
@@ -915,7 +945,9 @@ public static class StarlarkBuiltins
             StarlarkDict dict => EnumerateDictKeys(dict),
             StarlarkSet set => set.Items,
             StarlarkRange range => EnumerateRange(range),
-            _ => throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.")
+            StarlarkStringElems elems => elems.Enumerate(),
+            StarlarkBytesElems elems => elems.Enumerate(),
+            _ => throw new InvalidOperationException($"got {value.TypeName}, want iterable.")
         };
     }
 
@@ -928,7 +960,7 @@ public static class StarlarkBuiltins
             return intValue.Value;
         }
 
-        throw new InvalidOperationException($"Expected int, got '{value.TypeName}'.");
+        throw new InvalidOperationException($"got '{value.TypeName}', want int.");
     }
 
     private static string RequireString(StarlarkValue value)
@@ -960,7 +992,7 @@ public static class StarlarkBuiltins
             case StarlarkBytesElems elems:
                 return elems.Enumerate();
             default:
-                throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.");
+                throw new InvalidOperationException($"got {value.TypeName}, want iterable.");
         }
     }
 
@@ -1082,7 +1114,7 @@ public static class StarlarkBuiltins
 
     private static bool TryParseInt(string text, int baseValue, out long value)
     {
-        var trimmed = text.Trim();
+        var trimmed = text;
         if (trimmed.Length == 0)
         {
             value = 0;
@@ -1097,57 +1129,92 @@ public static class StarlarkBuiltins
             startIndex = 1;
         }
 
-        try
+        if (startIndex >= trimmed.Length)
         {
-            var slice = trimmed[startIndex..];
-            var resolvedBase = baseValue;
-            if (resolvedBase == 0)
+            value = 0;
+            return false;
+        }
+
+        var slice = trimmed[startIndex..];
+        var inferred = baseValue == 0;
+        var resolvedBase = inferred ? InferBase(slice) : baseValue;
+        if (slice.Length >= 2 && slice[0] == '0')
+        {
+            var prefix = char.ToLowerInvariant(slice[1]);
+            var prefixBase = prefix switch
             {
-                resolvedBase = InferBase(slice);
-                if (resolvedBase == 0)
+                'x' => 16,
+                'o' => 8,
+                'b' => 2,
+                _ => 0
+            };
+
+            if (prefixBase != 0)
+            {
+                if (!inferred && resolvedBase != prefixBase)
                 {
                     value = 0;
                     return false;
                 }
-            }
 
-            if (resolvedBase != 10 && slice.Length >= 2 && slice[0] == '0')
+                resolvedBase = prefixBase;
+                slice = slice[2..];
+            }
+        }
+
+        if (slice.Length == 0)
+        {
+            value = 0;
+            return false;
+        }
+
+        long parsed = 0;
+        foreach (var ch in slice)
+        {
+            var digit = DigitValue(ch);
+            if (digit < 0 || digit >= resolvedBase)
             {
-                var prefix = char.ToLowerInvariant(slice[1]);
-                if (prefix == 'x' || prefix == 'o' || prefix == 'b')
-                {
-                    slice = slice[2..];
-                    if (slice.Length == 0)
-                    {
-                        value = 0;
-                        return false;
-                    }
-                }
+                value = 0;
+                return false;
             }
 
-            var parsed = Convert.ToInt64(slice, resolvedBase);
-            value = parsed * sign;
-            return true;
+            try
+            {
+                parsed = checked(parsed * resolvedBase + digit);
+            }
+            catch (OverflowException)
+            {
+                value = 0;
+                return false;
+            }
         }
-        catch (FormatException)
+
+        value = parsed * sign;
+        return true;
+    }
+
+    private static int DigitValue(char ch)
+    {
+        if (ch >= '0' && ch <= '9')
         {
-            value = 0;
-            return false;
+            return ch - '0';
         }
-        catch (OverflowException)
+
+        if (ch >= 'a' && ch <= 'z')
         {
-            value = 0;
-            return false;
+            return 10 + (ch - 'a');
         }
+
+        if (ch >= 'A' && ch <= 'Z')
+        {
+            return 10 + (ch - 'A');
+        }
+
+        return -1;
     }
 
     private static int InferBase(string value)
     {
-        if (value.All(ch => ch == '0'))
-        {
-            return 10;
-        }
-
         if (value.Length < 2 || value[0] != '0')
         {
             return 10;
@@ -1158,7 +1225,7 @@ public static class StarlarkBuiltins
             'x' => 16,
             'o' => 8,
             'b' => 2,
-            _ => 0
+            _ => 10
         };
     }
 }

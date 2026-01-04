@@ -180,7 +180,7 @@ public sealed class ExpressionEvaluator
         if (function == null)
         {
             RuntimeErrors.Throw(
-                $"Attempted to call non-callable value of type '{callee.TypeName}'.",
+                "value is not callable.",
                 call.Span);
         }
 
@@ -199,7 +199,7 @@ public sealed class ExpressionEvaluator
                     if (seenKeyword || seenStar)
                     {
                         RuntimeErrors.Throw(
-                            "Positional argument follows keyword or *args argument.",
+                            "positional argument follows keyword or *args argument.",
                             call.Span);
                     }
 
@@ -363,6 +363,7 @@ public sealed class ExpressionEvaluator
             StarlarkString text => IndexString(text, key, span),
             StarlarkBytes bytes => IndexBytes(bytes, key, span),
             StarlarkDict dict => IndexDict(dict, key, span),
+            StarlarkRange range => IndexRange(range, key, span),
             _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Indexing not supported for type '{target.TypeName}'.",
                 span)
@@ -375,9 +376,9 @@ public sealed class ExpressionEvaluator
         StarlarkEnvironment environment,
         SourceSpan span)
     {
-        var start = EvaluateOptional(slice.Start, environment);
-        var stop = EvaluateOptional(slice.Stop, environment);
-        var step = EvaluateOptional(slice.Step, environment);
+        var start = EvaluateOptional(slice.Start, environment, "start");
+        var stop = EvaluateOptional(slice.Stop, environment, "end");
+        var step = EvaluateOptional(slice.Step, environment, "step");
 
         return target switch
         {
@@ -385,13 +386,17 @@ public sealed class ExpressionEvaluator
             StarlarkTuple tuple => SliceTuple(tuple, start, stop, step, span),
             StarlarkString text => SliceString(text, start, stop, step, span),
             StarlarkBytes bytes => SliceBytes(bytes, start, stop, step, span),
+            StarlarkRange range => SliceRange(range, start, stop, step, span),
             _ => RuntimeErrors.Fail<StarlarkValue>(
                 $"Slicing not supported for type '{target.TypeName}'.",
                 span)
         };
     }
 
-    private StarlarkInt? EvaluateOptional(Expression? expression, StarlarkEnvironment environment)
+    private StarlarkInt? EvaluateOptional(
+        Expression? expression,
+        StarlarkEnvironment environment,
+        string label)
     {
         if (expression == null)
         {
@@ -399,13 +404,18 @@ public sealed class ExpressionEvaluator
         }
 
         var value = Evaluate(expression, environment);
+        if (value is StarlarkNone)
+        {
+            return null;
+        }
+
         if (value is StarlarkInt intValue)
         {
             return intValue;
         }
 
         return RuntimeErrors.Fail<StarlarkInt>(
-            $"Slice indices must be int, got '{value.TypeName}'.",
+            $"invalid {label} index: got '{value.TypeName}', want int.",
             expression.Span);
     }
 
@@ -517,6 +527,34 @@ public sealed class ExpressionEvaluator
         return new StarlarkBytes(result.ToArray());
     }
 
+    private static StarlarkValue SliceRange(
+        StarlarkRange range,
+        StarlarkInt? start,
+        StarlarkInt? stop,
+        StarlarkInt? step,
+        SourceSpan span)
+    {
+        var length = checked((int)range.Count);
+        var (from, to, stride) = NormalizeSlice(length, start, stop, step, span);
+        var result = new List<StarlarkValue>();
+        if (stride > 0)
+        {
+            for (var i = from; i < to; i += stride)
+            {
+                result.Add(new StarlarkInt(range.Start + range.Step * i));
+            }
+        }
+        else
+        {
+            for (var i = from; i > to; i += stride)
+            {
+                result.Add(new StarlarkInt(range.Start + range.Step * i));
+            }
+        }
+
+        return new StarlarkList(result);
+    }
+
     private static (int Start, int Stop, int Step) NormalizeSlice(
         int length,
         StarlarkInt? start,
@@ -614,6 +652,19 @@ public sealed class ExpressionEvaluator
         return new StarlarkInt(bytes.Bytes[resolved]);
     }
 
+    private static StarlarkValue IndexRange(StarlarkRange range, StarlarkValue index, SourceSpan span)
+    {
+        var position = RequireIndex(index, span);
+        var count = range.Count;
+        var resolved = position < 0 ? count + position : position;
+        if (resolved < 0 || resolved >= count)
+        {
+            return RuntimeErrors.Fail<StarlarkValue>("Index out of range.", span);
+        }
+
+        return new StarlarkInt(range.Start + range.Step * resolved);
+    }
+
     private static StarlarkValue IndexDict(StarlarkDict dict, StarlarkValue key, SourceSpan span)
     {
         StarlarkHash.EnsureHashable(key);
@@ -622,7 +673,7 @@ public sealed class ExpressionEvaluator
             return value;
         }
 
-        RuntimeErrors.Throw("Key not found in dict.", span);
+        RuntimeErrors.Throw("Key not found.", span);
         return StarlarkNone.Instance;
     }
 
@@ -633,7 +684,7 @@ public sealed class ExpressionEvaluator
             return checked((int)intValue.Value);
         }
 
-        return RuntimeErrors.Fail<int>($"Index must be an int, got '{index.TypeName}'.", span);
+        return RuntimeErrors.Fail<int>($"got '{index.TypeName}', want int.", span);
     }
 
     private static int ResolveIndex(int position, int length, SourceSpan span)
@@ -789,6 +840,16 @@ public sealed class ExpressionEvaluator
 
     private static int CompareNonNumeric(StarlarkValue left, StarlarkValue right)
     {
+        if (left is StarlarkList leftList && right is StarlarkList rightList)
+        {
+            return CompareSequences(leftList.Items, rightList.Items);
+        }
+
+        if (left is StarlarkTuple leftTuple && right is StarlarkTuple rightTuple)
+        {
+            return CompareSequences(leftTuple.Items, rightTuple.Items);
+        }
+
         if (left is StarlarkString leftString && right is StarlarkString rightString)
         {
             return string.Compare(leftString.Value, rightString.Value, StringComparison.Ordinal);
@@ -805,7 +866,47 @@ public sealed class ExpressionEvaluator
         }
 
         return RuntimeErrors.Fail<int>(
-            $"Comparison not supported between '{left.TypeName}' and '{right.TypeName}'.");
+            $"not implemented: comparison between '{left.TypeName}' and '{right.TypeName}'.");
+    }
+
+    private static int CompareSequences(IReadOnlyList<StarlarkValue> left, IReadOnlyList<StarlarkValue> right)
+    {
+        var count = Math.Min(left.Count, right.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var compare = CompareOrdering(left[i], right[i]);
+            if (compare != 0)
+            {
+                return compare;
+            }
+        }
+
+        return left.Count.CompareTo(right.Count);
+    }
+
+    private static int CompareOrdering(StarlarkValue left, StarlarkValue right)
+    {
+        if (left is StarlarkInt leftInt && right is StarlarkInt rightInt)
+        {
+            return leftInt.Value.CompareTo(rightInt.Value);
+        }
+
+        if (left is StarlarkFloat leftFloat && right is StarlarkFloat rightFloat)
+        {
+            return leftFloat.Value.CompareTo(rightFloat.Value);
+        }
+
+        if (left is StarlarkInt leftNumber && right is StarlarkFloat rightNumber)
+        {
+            return StarlarkNumber.CompareIntFloat(leftNumber.Value, rightNumber.Value);
+        }
+
+        if (left is StarlarkFloat leftNumberFloat && right is StarlarkInt rightNumberInt)
+        {
+            return StarlarkNumber.CompareFloatInt(leftNumberFloat.Value, rightNumberInt.Value);
+        }
+
+        return CompareNonNumeric(left, right);
     }
 
     private static int CompareBytes(byte[] left, byte[] right)
@@ -969,9 +1070,9 @@ public sealed class ExpressionEvaluator
             case StarlarkRange range:
                 return EnumerateRange(range);
             default:
-                return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
-                    $"Type '{value.TypeName}' is not iterable.",
-                    span);
+        return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
+            $"got {value.TypeName}, want iterable.",
+            span);
         }
     }
 
@@ -1092,7 +1193,7 @@ public sealed class ExpressionEvaluator
                 return elems.Enumerate();
             default:
                 return RuntimeErrors.Fail<IEnumerable<StarlarkValue>>(
-                    $"Object of type '{value.TypeName}' is not iterable.",
+                    $"got {value.TypeName}, want iterable.",
                     span);
         }
     }

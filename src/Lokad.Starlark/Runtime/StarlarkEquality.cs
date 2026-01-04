@@ -79,6 +79,11 @@ internal static class StarlarkEquality
             return SetEquals(leftSet, rightSet, active);
         }
 
+        if (left is StarlarkRange leftRange && right is StarlarkRange rightRange)
+        {
+            return leftRange.SequenceEquals(rightRange);
+        }
+
         return false;
     }
 

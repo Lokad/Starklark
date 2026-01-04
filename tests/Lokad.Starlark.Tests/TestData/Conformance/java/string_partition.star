@@ -6,6 +6,6 @@ assert_eq("google".rpartition("o"), ("go", "o", "gle"))
 assert_eq("google".partition("x"), ("google", "", ""))
 assert_eq("google".rpartition("x"), ("", "", "google"))
 ---
-"google".partition("") ### (separator cannot be empty)
+"google".partition("") ### (empty separator|separator cannot be empty)
 ---
-"google".rpartition("") ### (separator cannot be empty)
+"google".rpartition("") ### (empty separator|separator cannot be empty)

@@ -10,6 +10,7 @@ public sealed class ModuleEvaluator
 
     public StarlarkValue? ExecuteModule(StarlarkModule module, StarlarkEnvironment environment)
     {
+        environment.DeclareGlobals(ModuleGlobalAnalyzer.CollectGlobals(module.Statements));
         var result = ExecuteStatements(module.Statements, environment);
         switch (result.Kind)
         {
@@ -350,7 +351,7 @@ public sealed class ModuleEvaluator
                 break;
             default:
                 RuntimeErrors.Throw(
-                    $"Operator '+=' not supported for '{list.TypeName}' and '{value.TypeName}'.");
+                    $"unknown binary op: {list.TypeName} += {value.TypeName}");
                 break;
         }
     }
@@ -398,7 +399,7 @@ public sealed class ModuleEvaluator
             return value;
         }
 
-        RuntimeErrors.Throw("Key not found in dict.", span);
+        RuntimeErrors.Throw("Key not found.", span);
         return StarlarkNone.Instance;
     }
 
@@ -676,7 +677,7 @@ public sealed class ModuleEvaluator
                 }
                 yield break;
             default:
-                RuntimeErrors.Throw($"Type '{iterable.TypeName}' is not iterable.", span);
+                RuntimeErrors.Throw($"got {iterable.TypeName}, want iterable.", span);
                 yield break;
         }
     }

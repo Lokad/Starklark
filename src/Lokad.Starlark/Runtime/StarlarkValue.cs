@@ -179,6 +179,10 @@ public sealed class StarlarkList : StarlarkValue
             }
 
             yield return Items[i];
+            if (version != Version)
+            {
+                throw new InvalidOperationException("mutate an iterable for an iterator while iterating");
+            }
         }
     }
 
@@ -337,6 +341,10 @@ public sealed class StarlarkDict : StarlarkValue
             }
 
             yield return Entries[i].Key;
+            if (version != Version)
+            {
+                throw new InvalidOperationException("mutate an iterable for an iterator while iterating");
+            }
         }
     }
 
@@ -385,6 +393,10 @@ public sealed class StarlarkSet : StarlarkValue
             }
 
             yield return Items[i];
+            if (version != Version)
+            {
+                throw new InvalidOperationException("mutate an iterable for an iterator while iterating");
+            }
         }
     }
 
@@ -485,14 +497,54 @@ public sealed class StarlarkRange : StarlarkValue, IEquatable<StarlarkRange>
         ? Start >= Stop ? 0 : (Stop - Start + Step - 1) / Step
         : Start <= Stop ? 0 : (Start - Stop - Step - 1) / -Step;
 
-    public bool Equals(StarlarkRange? other) => other != null
-        && Start == other.Start
-        && Stop == other.Stop
-        && Step == other.Step;
+    public bool Equals(StarlarkRange? other)
+    {
+        if (other == null)
+        {
+            return false;
+        }
+
+        return SequenceEquals(other);
+    }
 
     public override bool Equals(object? obj) => obj is StarlarkRange other && Equals(other);
 
-    public override int GetHashCode() => HashCode.Combine(Start, Stop, Step);
+    public override int GetHashCode()
+    {
+        var count = Count;
+        if (count == 0)
+        {
+            return 0;
+        }
+
+        if (count == 1)
+        {
+            return HashCode.Combine(Start);
+        }
+
+        return HashCode.Combine(Start, Step, count);
+    }
+
+    internal bool SequenceEquals(StarlarkRange other)
+    {
+        var count = Count;
+        if (count != other.Count)
+        {
+            return false;
+        }
+
+        if (count == 0)
+        {
+            return true;
+        }
+
+        if (count == 1)
+        {
+            return Start == other.Start;
+        }
+
+        return Start == other.Start && Step == other.Step;
+    }
 }
 
 public sealed class StarlarkNone : StarlarkValue
@@ -673,7 +725,7 @@ public sealed class StarlarkUserFunction : StarlarkCallable
             if (values[i] == null)
             {
                 throw new InvalidOperationException(
-                    $"Function '{Name}' expects {Parameters.Count} arguments but got {args.Count + kwargs.Count}.");
+                    $"missing 1 argument: '{Parameters[i]}'.");
             }
         }
 

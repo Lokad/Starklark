@@ -34,7 +34,7 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
         catch (ParseException ex)
         {
             throw new StarlarkParseException(
-                $"Found `{ex.Token}` but expected {string.Concat(", ", ex.Expected)}.",
+                $"syntax error: found `{ex.Token}` but expected {string.Concat(", ", ex.Expected)}.",
                 ex.Location,
                 ex);
         }
@@ -53,7 +53,10 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     }
 
     [Rule]
-    public StatementLine SimpleStatementLine([NT] StatementSequence sequence, [T(Token.EoL)] Token eol)
+    public StatementLine SimpleStatementLine(
+        [NT] StatementSequence sequence,
+        [O(Token.Semicolon)] Token? trailing,
+        [T(Token.EoL)] Token eol)
     {
         return new StatementLine(sequence.Statements);
     }
@@ -65,11 +68,33 @@ public sealed class StarlarkModuleParser : StarlarkGrammar<StarlarkModuleParser,
     }
 
     [Rule]
-    public StatementSequence SimpleStatementSequence(
-        [L(Sep = Token.Semicolon, Min = 1)] SimpleStatement[] statements,
-        [O(Token.Semicolon)] Token? trailing)
+    public StatementSequence SimpleStatementSequenceSingle([NT] SimpleStatement statement)
     {
-        return new StatementSequence(statements.Select(statement => statement.Statement).ToArray());
+        return new StatementSequence(new[] { statement.Statement });
+    }
+
+    [Rule]
+    public StatementSequence SimpleStatementSequenceTrailing(
+        [NT] SimpleStatement statement,
+        [T(Token.Semicolon)] Token semicolon)
+    {
+        return new StatementSequence(new[] { statement.Statement });
+    }
+
+    [Rule]
+    public StatementSequence SimpleStatementSequenceMany(
+        [NT] SimpleStatement statement,
+        [T(Token.Semicolon)] Token semicolon,
+        [NT] StatementSequence rest)
+    {
+        var statements = new Statement[rest.Statements.Count + 1];
+        statements[0] = statement.Statement;
+        for (var i = 0; i < rest.Statements.Count; i++)
+        {
+            statements[i + 1] = rest.Statements[i];
+        }
+
+        return new StatementSequence(statements);
     }
 
     [Rule]

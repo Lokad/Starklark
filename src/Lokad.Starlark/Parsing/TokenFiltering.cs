@@ -9,6 +9,7 @@ internal static class TokenFiltering
     {
         var filtered = new List<LexerToken<Token>>(tokens.Count);
         var depth = 0;
+        var suppressedIndent = 0;
         var sourceTokens = tokens.Tokens;
 
         for (var i = 0; i < sourceTokens.Count; i++)
@@ -33,8 +34,27 @@ internal static class TokenFiltering
                     filtered.Add(token);
                     continue;
                 case Token.EoL:
+                    if (depth > 0)
+                    {
+                        continue;
+                    }
+
+                    break;
                 case Token.Indent:
+                    if (depth > 0)
+                    {
+                        suppressedIndent++;
+                        continue;
+                    }
+
+                    break;
                 case Token.Dedent:
+                    if (suppressedIndent > 0)
+                    {
+                        suppressedIndent--;
+                        continue;
+                    }
+
                     if (depth > 0)
                     {
                         continue;

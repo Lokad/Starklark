@@ -15,7 +15,8 @@ public static class StarlarkFormatting
     public static string FormatPercent(string format, StarlarkValue args)
     {
         var usesMapping = ContainsMappingSpec(format);
-        var arguments = new FormatArguments(args, usesMapping);
+        var conversionCount = usesMapping ? 0 : CountConversions(format);
+        var arguments = new FormatArguments(args, usesMapping, conversionCount == 1);
         var builder = new StringBuilder();
 
         for (var i = 0; i < format.Length; i++)
@@ -71,6 +72,55 @@ public static class StarlarkFormatting
 
         arguments.EnsureAllConsumed();
         return builder.ToString();
+    }
+
+    private static int CountConversions(string format)
+    {
+        var count = 0;
+        for (var i = 0; i < format.Length; i++)
+        {
+            if (format[i] != '%')
+            {
+                continue;
+            }
+
+            if (i + 1 < format.Length && format[i + 1] == '%')
+            {
+                i++;
+                continue;
+            }
+
+            i++;
+            if (i >= format.Length)
+            {
+                throw new InvalidOperationException("Incomplete format specifier.");
+            }
+
+            if (format[i] == '(')
+            {
+                var start = i + 1;
+                var end = format.IndexOf(')', start);
+                if (end < 0)
+                {
+                    throw new InvalidOperationException("Incomplete format key.");
+                }
+
+                i = end + 1;
+            }
+
+            ParseFlags(format, ref i);
+            ParseWidth(format, ref i);
+            ParsePrecision(format, ref i);
+
+            if (i >= format.Length)
+            {
+                throw new InvalidOperationException("Incomplete format specifier.");
+            }
+
+            count++;
+        }
+
+        return count;
     }
 
     private static string Format(StarlarkValue value, bool quoteStrings)
@@ -570,7 +620,7 @@ public static class StarlarkFormatting
         private int _index;
         private readonly bool _isSingle;
 
-        public FormatArguments(StarlarkValue args, bool usesMapping)
+        public FormatArguments(StarlarkValue args, bool usesMapping, bool singleConversion)
         {
             if (usesMapping)
             {
@@ -581,6 +631,13 @@ public static class StarlarkFormatting
 
                 _sequence = Array.Empty<StarlarkValue>();
                 _mapping = dict;
+                return;
+            }
+
+            if (singleConversion)
+            {
+                _sequence = new[] { args };
+                _isSingle = true;
                 return;
             }
 

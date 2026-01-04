@@ -237,6 +237,28 @@ public sealed class ModuleParsingTests
     }
 
     [Fact]
+    public void ParsesIndentedBracketedList()
+    {
+        var module = StarlarkModuleParser.ParseModule("values = [\n  1,\n  2,\n]\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
+        var list = Assert.IsType<ListExpression>(assignment.Value);
+        Assert.Equal(2, list.Items.Count);
+    }
+
+    [Fact]
+    public void ParsesIndentedCallArguments()
+    {
+        var module = StarlarkModuleParser.ParseModule("result = f(\n  1,\n  2,\n)\n");
+
+        var statement = Assert.Single(module.Statements);
+        var assignment = Assert.IsType<AssignmentStatement>(SyntaxNormalization.Normalize(statement));
+        var call = Assert.IsType<CallExpression>(assignment.Value);
+        Assert.Equal(2, call.Arguments.Count);
+    }
+
+    [Fact]
     public void ParsesLoadStatement()
     {
         var module = StarlarkModuleParser.ParseModule("load(\"math\", \"sin\", cosine=\"cos\")\n");

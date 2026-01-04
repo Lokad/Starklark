@@ -27,7 +27,7 @@ internal static class BinaryOperatorEvaluator
             BinaryOperator.ShiftLeft => ShiftLeft(left, right),
             BinaryOperator.ShiftRight => ShiftRight(left, right),
             _ => RuntimeErrors.Fail<StarlarkValue>(
-                unsupportedMessage ?? $"Operator '{op}' not supported.")
+                unsupportedMessage ?? $"unknown binary op: {op}.")
         };
     }
 
@@ -72,8 +72,7 @@ internal static class BinaryOperatorEvaluator
                 : new StarlarkFloat(leftNumber + rightNumber);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '+' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("+", left, right);
     }
 
     internal static StarlarkValue Subtract(StarlarkValue left, StarlarkValue right)
@@ -96,8 +95,7 @@ internal static class BinaryOperatorEvaluator
                 : new StarlarkFloat(leftNumber - rightNumber);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '-' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("-", left, right);
     }
 
     internal static StarlarkValue Multiply(StarlarkValue left, StarlarkValue right)
@@ -155,8 +153,7 @@ internal static class BinaryOperatorEvaluator
                 : new StarlarkFloat(leftNumber * rightNumber);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '*' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("*", left, right);
     }
 
     internal static StarlarkValue Divide(StarlarkValue left, StarlarkValue right)
@@ -172,8 +169,7 @@ internal static class BinaryOperatorEvaluator
             return new StarlarkFloat(leftNumber / rightNumber);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '/' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("/", left, right);
     }
 
     internal static StarlarkValue FloorDivide(StarlarkValue left, StarlarkValue right)
@@ -206,8 +202,7 @@ internal static class BinaryOperatorEvaluator
             return new StarlarkFloat(Math.Floor(leftNumber / rightNumber));
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '//' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("//", left, right);
     }
 
     internal static StarlarkValue Modulo(StarlarkValue left, StarlarkValue right)
@@ -247,8 +242,7 @@ internal static class BinaryOperatorEvaluator
             return new StarlarkFloat(leftNumber - quotient * rightNumber);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '%' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("%", left, right);
     }
 
     internal static StarlarkValue BitwiseOr(StarlarkValue left, StarlarkValue right)
@@ -268,8 +262,7 @@ internal static class BinaryOperatorEvaluator
             return UnionSet(leftSet, rightSet);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '|' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("|", left, right);
     }
 
     internal static StarlarkValue BitwiseXor(StarlarkValue left, StarlarkValue right)
@@ -284,8 +277,7 @@ internal static class BinaryOperatorEvaluator
             return SymmetricDifferenceSet(leftSet, rightSet);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '^' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("^", left, right);
     }
 
     internal static StarlarkValue BitwiseAnd(StarlarkValue left, StarlarkValue right)
@@ -300,8 +292,7 @@ internal static class BinaryOperatorEvaluator
             return IntersectionSet(leftSet, rightSet);
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '&' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("&", left, right);
     }
 
     internal static StarlarkValue ShiftLeft(StarlarkValue left, StarlarkValue right)
@@ -316,8 +307,7 @@ internal static class BinaryOperatorEvaluator
             return new StarlarkInt(leftInt.Value << (int)Math.Min(rightInt.Value, int.MaxValue));
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '<<' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp("<<", left, right);
     }
 
     internal static StarlarkValue ShiftRight(StarlarkValue left, StarlarkValue right)
@@ -332,8 +322,7 @@ internal static class BinaryOperatorEvaluator
             return new StarlarkInt(leftInt.Value >> (int)Math.Min(rightInt.Value, int.MaxValue));
         }
 
-        return RuntimeErrors.Fail<StarlarkValue>(
-            $"Operator '>>' not supported for '{left.TypeName}' and '{right.TypeName}'.");
+        return FailBinaryOp(">>", left, right);
     }
 
     internal static StarlarkDict UnionDict(StarlarkDict left, StarlarkDict right)
@@ -461,6 +450,12 @@ internal static class BinaryOperatorEvaluator
         }
 
         return false;
+    }
+
+    private static StarlarkValue FailBinaryOp(string op, StarlarkValue left, StarlarkValue right)
+    {
+        return RuntimeErrors.Fail<StarlarkValue>(
+            $"unknown binary op: {left.TypeName} {op} {right.TypeName}");
     }
 
     private static byte[] RepeatBytes(byte[] bytes, long count)

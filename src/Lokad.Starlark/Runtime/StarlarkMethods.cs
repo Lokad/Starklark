@@ -17,9 +17,13 @@ public static class StarlarkMethods
             StarlarkList list => BindList(list, name),
             StarlarkDict dict => BindDict(dict, name),
             StarlarkSet set => BindSet(set, name),
-            _ => throw new InvalidOperationException(
-                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+            _ => throw MissingAttribute(target, name)
         };
+    }
+
+    private static InvalidOperationException MissingAttribute(StarlarkValue target, string name)
+    {
+        return new InvalidOperationException($"no field or method '{name}' for '{target.TypeName}'.");
     }
 
     private static StarlarkValue BindString(StarlarkString target, string name)
@@ -58,8 +62,7 @@ public static class StarlarkMethods
             "removesuffix" => new StarlarkBoundMethod(name, target, StringRemoveSuffix),
             "elems" => new StarlarkBoundMethod(name, target, StringElems),
             "format" => new StarlarkBoundMethod(name, target, StringFormat),
-            _ => throw new InvalidOperationException(
-                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+            _ => throw MissingAttribute(target, name)
         };
     }
 
@@ -68,8 +71,7 @@ public static class StarlarkMethods
         return name switch
         {
             "elems" => new StarlarkBoundMethod(name, target, BytesElems),
-            _ => throw new InvalidOperationException(
-                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+            _ => throw MissingAttribute(target, name)
         };
     }
 
@@ -84,8 +86,7 @@ public static class StarlarkMethods
             "remove" => new StarlarkBoundMethod(name, target, ListRemove),
             "pop" => new StarlarkBoundMethod(name, target, ListPop),
             "index" => new StarlarkBoundMethod(name, target, ListIndex),
-            _ => throw new InvalidOperationException(
-                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+            _ => throw MissingAttribute(target, name)
         };
     }
 
@@ -102,8 +103,7 @@ public static class StarlarkMethods
             "clear" => new StarlarkBoundMethod(name, target, DictClear),
             "setdefault" => new StarlarkBoundMethod(name, target, DictSetDefault),
             "update" => new StarlarkBoundMethod(name, target, DictUpdate),
-            _ => throw new InvalidOperationException(
-                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+            _ => throw MissingAttribute(target, name)
         };
     }
 
@@ -127,8 +127,7 @@ public static class StarlarkMethods
             "symmetric_difference_update" => new StarlarkBoundMethod(name, target, SetSymmetricDifferenceUpdate),
             "union" => new StarlarkBoundMethod(name, target, SetUnion),
             "update" => new StarlarkBoundMethod(name, target, SetUpdate),
-            _ => throw new InvalidOperationException(
-                $"Object of type '{target.TypeName}' has no attribute '{name}'.")
+            _ => throw MissingAttribute(target, name)
         };
     }
 
@@ -179,7 +178,7 @@ public static class StarlarkMethods
             throw new InvalidOperationException("splitlines expects 0 or 1 arguments.");
         }
 
-        var keepEnds = args.Count == 1 && args[0].IsTruthy;
+        var keepEnds = args.Count == 1 && RequireBool(args[0]);
         var text = ((StarlarkString)target).Value;
         var result = new List<StarlarkValue>();
 
@@ -929,7 +928,7 @@ public static class StarlarkMethods
             return args[1];
         }
 
-        throw new KeyNotFoundException("Key not found in dict.");
+        throw new KeyNotFoundException("Key not found.");
     }
     private static StarlarkValue DictPopItem(
         StarlarkValue target,
@@ -1423,7 +1422,7 @@ public static class StarlarkMethods
         var sep = RequireString(args[0]);
         if (sep.Length == 0)
         {
-            throw new InvalidOperationException("partition separator cannot be empty.");
+            throw new InvalidOperationException("empty separator.");
         }
 
         var index = fromRight
@@ -1547,7 +1546,7 @@ public static class StarlarkMethods
                     var index = int.Parse(field, CultureInfo.InvariantCulture);
                     if (index < 0 || index >= args.Count)
                     {
-                        throw new InvalidOperationException("Tuple index out of range.");
+                        throw new InvalidOperationException("index out of range.");
                     }
 
                     value = args[index];
@@ -1559,7 +1558,7 @@ public static class StarlarkMethods
                         throw new InvalidOperationException($"Missing argument '{field}'.");
                     }
                 }
-                else
+                else if (!kwargs.TryGetValue(field, out value!))
                 {
                     throw new InvalidOperationException("Invalid format field.");
                 }
@@ -1811,7 +1810,7 @@ public static class StarlarkMethods
             {
                 if (item is not StarlarkString tupleString)
                 {
-                    throw new InvalidOperationException("Expected string in tuple.");
+                    throw new InvalidOperationException($"got '{item.TypeName}', want string.");
                 }
 
                 result.Add(tupleString.Value);
@@ -1820,7 +1819,7 @@ public static class StarlarkMethods
             return result;
         }
 
-        throw new InvalidOperationException("Expected string or tuple of strings.");
+        throw new InvalidOperationException($"got '{value.TypeName}', want string or tuple of strings.");
     }
 
     private static IEnumerable<StarlarkValue> EnumerateIterable(StarlarkValue value)
@@ -1842,7 +1841,7 @@ public static class StarlarkMethods
             case StarlarkBytesElems elems:
                 return elems.Enumerate();
             default:
-                throw new InvalidOperationException($"Object of type '{value.TypeName}' is not iterable.");
+                throw new InvalidOperationException($"got {value.TypeName}, want iterable.");
         }
     }
 
@@ -2090,7 +2089,7 @@ public static class StarlarkMethods
             return boolValue.Value;
         }
 
-        throw new InvalidOperationException($"Expected bool, got '{value.TypeName}'.");
+        throw new InvalidOperationException($"expected bool, got '{value.TypeName}'.");
     }
 
     private enum TrimMode

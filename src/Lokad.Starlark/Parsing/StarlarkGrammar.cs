@@ -126,13 +126,13 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [L] LineEnding[] lineEndings,
         [T(Token.Id)] Pos<string> name,
         [T(Token.Assign)] Pos<string> assign,
-        [NT(3)] Expression value)
+        [NT(6)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Keyword, name.Value, value);
     }
 
     [Rule]
-    public CallArgument PositionalArgument([L] LineEnding[] lineEndings, [NT(3)] Expression value)
+    public CallArgument PositionalArgument([L] LineEnding[] lineEndings, [NT(6)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Positional, null, value);
     }
@@ -141,7 +141,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public CallArgument StarArgument(
         [L] LineEnding[] lineEndings,
         [T(Token.Star)] Pos<string> star,
-        [NT(3)] Expression value)
+        [NT(6)] Expression value)
     {
         return new CallArgument(CallArgumentKind.Star, null, value);
     }
@@ -150,7 +150,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     public CallArgument StarStarArgument(
         [L] LineEnding[] lineEndings,
         [T(Token.StarStar)] Pos<string> star,
-        [NT(3)] Expression value)
+        [NT(6)] Expression value)
     {
         return new CallArgument(CallArgumentKind.StarStar, null, value);
     }
@@ -212,9 +212,9 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public DictEntry DictEntry(
-        [NT(3)] Expression key,
+        [NT(6)] Expression key,
         [T(Token.Colon)] Token colon,
-        [NT(3)] Expression value)
+        [NT(6)] Expression value)
     {
         return new DictEntry(key, value);
     }
@@ -222,9 +222,9 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public Expression DictComprehension(
         [T(Token.OpenBrace)] Pos<string> open,
-        [NT(3)] Expression key,
+        [NT(6)] Expression key,
         [T(Token.Colon)] Pos<string> colon,
-        [NT(3)] Expression value,
+        [NT(6)] Expression value,
         [NT] ComprehensionFor forClause,
         [L] ComprehensionQualifier[] qualifiers,
         [T(Token.CloseBrace)] Pos<string> close)
@@ -262,7 +262,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [T(Token.For)] Pos<string> keyword,
         [NT] AssignmentTarget target,
         [T(Token.In)] Pos<string> inKeyword,
-        [NT(2)] Expression iterable)
+        [NT(5)] Expression iterable)
     {
         return new ComprehensionFor(
             new ComprehensionClause(
@@ -278,7 +278,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [T(Token.For)] Pos<string> keyword,
         [NT] AssignmentTarget target,
         [T(Token.In)] Pos<string> inKeyword,
-        [NT(2)] Expression iterable)
+        [NT(5)] Expression iterable)
     {
         return new ComprehensionQualifier(
             new ComprehensionClause(
@@ -292,7 +292,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
     [Rule]
     public ComprehensionQualifier ComprehensionQualifierIf(
         [T(Token.If)] Pos<string> keyword,
-        [NT] Expression condition)
+        [NT(5)] Expression condition)
     {
         return new ComprehensionQualifier(
             new ComprehensionClause(
@@ -404,7 +404,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [L] LineEnding[] lineEndings,
         [T(Token.Id)] string name,
         [T(Token.Assign)] Token assign,
-        [NT(2)] Expression value)
+        [NT(6)] Expression value)
     {
         return new FunctionParameter(name, value, ParameterKind.Normal);
     }
@@ -451,7 +451,7 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
 
     [Rule]
     public InfixRight AndThen(
-        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.FloorDivide, Token.Percent, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.And, Token.Or, Token.Pipe, Token.Caret, Token.Ampersand, Token.ShiftLeft, Token.ShiftRight)] Token op,
+        [T(Token.Plus, Token.Minus, Token.Star, Token.Slash, Token.FloorDivide, Token.Percent, Token.Equal, Token.NotEqual, Token.In, Token.Less, Token.LessEqual, Token.Greater, Token.GreaterEqual, Token.Pipe, Token.Caret, Token.Ampersand, Token.ShiftLeft, Token.ShiftRight)] Token op,
         [NT(1)] Expression right)
     {
         return new InfixRight
@@ -476,8 +476,6 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
                 Token.LessEqual => BinaryOperator.LessEqual,
                 Token.Greater => BinaryOperator.Greater,
                 Token.GreaterEqual => BinaryOperator.GreaterEqual,
-                Token.And => BinaryOperator.And,
-                Token.Or => BinaryOperator.Or,
                 _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
             },
             Right = right
@@ -557,13 +555,75 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return left;
     }
 
-    [Rule(Rank = 3)]
+    public struct AndRight
+    {
+        public Expression Right { get; set; }
+    }
+
+    public struct OrRight
+    {
+        public Expression Right { get; set; }
+    }
+
+    [Rule]
+    public AndRight LogicalAndThen(
+        [T(Token.And)] Token op,
+        [NT(3)] Expression right)
+    {
+        return new AndRight { Right = right };
+    }
+
+    [Rule]
+    public OrRight LogicalOrThen(
+        [T(Token.Or)] Token op,
+        [NT(4)] Expression right)
+    {
+        return new OrRight { Right = right };
+    }
+
+    [Rule(Rank = 4)]
+    public Expression AndExpression(
+        [NT(3)] Expression left,
+        [L(Min = 1)] AndRight[] right)
+    {
+        var expression = left;
+        foreach (var next in right)
+        {
+            expression = new BinaryExpression(
+                expression,
+                BinaryOperator.And,
+                next.Right,
+                SpanBetween(expression.Span, next.Right.Span));
+        }
+
+        return expression;
+    }
+
+    [Rule(Rank = 5)]
+    public Expression OrExpression(
+        [NT(4)] Expression left,
+        [L(Min = 1)] OrRight[] right)
+    {
+        var expression = left;
+        foreach (var next in right)
+        {
+            expression = new BinaryExpression(
+                expression,
+                BinaryOperator.Or,
+                next.Right,
+                SpanBetween(expression.Span, next.Right.Span));
+        }
+
+        return expression;
+    }
+
+    [Rule(Rank = 6)]
     public Expression Conditional(
-        [NT(2)] Expression thenExpression,
+        [NT(5)] Expression thenExpression,
         [T(Token.If)] Pos<string> keyword,
-        [NT(2)] Expression condition,
+        [NT(5)] Expression condition,
         [T(Token.Else)] Pos<string> elseKeyword,
-        [NT(3)] Expression elseExpression)
+        [NT(6)] Expression elseExpression)
     {
         return new ConditionalExpression(
             condition,
@@ -572,21 +632,21 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
             SpanBetween(thenExpression.Span, elseExpression.Span));
     }
 
-    [Rule(Rank = 5)]
+    [Rule(Rank = 8)]
     public Expression Lambda(
         [T(Token.Lambda)] Pos<string> keyword,
         [L(Sep = Token.Comma)] FunctionParameter[] parameters,
         [O(Token.TrailingComma)] Token? trailing,
         [T(Token.Colon)] Pos<string> colon,
-        [NT(5)] Expression body)
+        [NT(8)] Expression body)
     {
         ValidateParameters(parameters, "lambda");
         return new LambdaExpression(parameters, body, SpanBetween(keyword.Location, body.Span));
     }
 
-    [Rule(Rank = 4)]
+    [Rule(Rank = 7)]
     public Expression TupleExpression(
-        [NT(2)] Expression first,
+        [NT(6)] Expression first,
         [T(Token.Comma)] Pos<string> comma,
         [L(Sep = Token.Comma)] Expression[] rest)
     {
@@ -600,9 +660,9 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new TupleExpression(items, SpanBetween(first.Span, items[^1].Span));
     }
 
-    [Rule(Rank = 4)]
+    [Rule(Rank = 7)]
     public Expression TupleExpressionTrailingComma(
-        [NT(2)] Expression first,
+        [NT(6)] Expression first,
         [T(Token.Comma)] Pos<string> comma,
         [L(End = Token.Comma, Min = 1)] Expression[] rest)
     {
@@ -617,9 +677,9 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         return new TupleExpression(items, SpanBetween(first.Span, spanEnd));
     }
 
-    [Rule(Rank = 4)]
+    [Rule(Rank = 7)]
     public Expression TupleExpressionSingle(
-        [NT(2)] Expression first,
+        [NT(6)] Expression first,
         [T(Token.Comma)] Pos<string> comma)
     {
         return new TupleExpression(new[] { first }, SpanBetween(first.Span, comma.Location));

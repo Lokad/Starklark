@@ -33,7 +33,7 @@ public sealed class StarlarkParser : StarlarkGrammar<StarlarkParser, ExpressionR
         catch (ParseException ex)
         {
             throw new StarlarkParseException(
-                $"Found `{ex.Token}` but expected {string.Concat(", ", ex.Expected)}.",
+                $"syntax error: found `{ex.Token}` but expected {string.Concat(", ", ex.Expected)}.",
                 ex.Location,
                 ex);
         }

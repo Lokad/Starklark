@@ -8,6 +8,7 @@ public sealed class StarlarkEnvironment
 {
     private readonly Dictionary<string, StarlarkValue> _locals;
     private readonly IReadOnlySet<string>? _declaredLocals;
+    private HashSet<string>? _declaredGlobals;
     private readonly Stack<IReadOnlyList<Statement>> _callStack;
     private ExecutionGuard _guard;
 
@@ -120,10 +121,31 @@ public sealed class StarlarkEnvironment
                 value = StarlarkNone.Instance;
                 return LookupResult.ReferencedBeforeAssignment;
             }
+
+            if (scope.Parent == null && scope._declaredGlobals != null && scope._declaredGlobals.Contains(name))
+            {
+                value = StarlarkNone.Instance;
+                return LookupResult.ReferencedBeforeAssignment;
+            }
         }
 
         value = StarlarkNone.Instance;
         return LookupResult.NotFound;
+    }
+
+    internal void DeclareGlobals(IReadOnlySet<string> names)
+    {
+        if (Parent != null)
+        {
+            Parent.DeclareGlobals(names);
+            return;
+        }
+
+        _declaredGlobals ??= new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            _declaredGlobals.Add(name);
+        }
     }
 }
 
