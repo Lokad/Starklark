@@ -17,6 +17,7 @@ public sealed class ExpressionEvaluator
             IdentifierExpression identifier => ResolveIdentifier(identifier, environment),
             UnaryExpression unary => EvaluateUnary(unary, environment),
             BinaryExpression binary => EvaluateBinary(binary, environment),
+            ComparisonExpression comparison => EvaluateComparison(comparison, environment),
             CallExpression call => EvaluateCall(call, environment),
             ListExpression list => EvaluateList(list, environment),
             TupleExpression tuple => EvaluateTuple(tuple, environment),
@@ -114,6 +115,13 @@ public sealed class ExpressionEvaluator
 
     private StarlarkValue EvaluateBinary(BinaryExpression binary, StarlarkEnvironment environment)
     {
+        if (binary.Operator.IsComparison() &&
+            binary.Left is BinaryExpression leftComparison &&
+            leftComparison.Operator.IsComparison())
+        {
+            return EvaluateChainedBinaryComparison(binary, environment);
+        }
+
         if (binary.Operator == BinaryOperator.And)
         {
             var left = Evaluate(binary.Left, environment);
@@ -145,6 +153,71 @@ public sealed class ExpressionEvaluator
             BinaryOperator.Greater => new StarlarkBool(CompareRelational(leftValue, rightValue, RelationalOperator.Greater)),
             BinaryOperator.GreaterEqual => new StarlarkBool(CompareRelational(leftValue, rightValue, RelationalOperator.GreaterEqual)),
             _ => throw new ArgumentOutOfRangeException(nameof(binary.Operator), binary.Operator, null)
+        };
+    }
+
+    private StarlarkValue EvaluateChainedBinaryComparison(BinaryExpression binary, StarlarkEnvironment environment)
+    {
+        var operands = new List<Expression>();
+        var operators = new List<BinaryOperator>();
+        BuildComparisonChain(binary, operands, operators);
+        return EvaluateComparison(
+            new ComparisonExpression(operands, operators, binary.Span),
+            environment);
+    }
+
+    private static void BuildComparisonChain(
+        Expression expression,
+        List<Expression> operands,
+        List<BinaryOperator> operators)
+    {
+        if (expression is BinaryExpression binary && binary.Operator.IsComparison())
+        {
+            BuildComparisonChain(binary.Left, operands, operators);
+            operators.Add(binary.Operator);
+            operands.Add(binary.Right);
+        }
+        else
+        {
+            operands.Add(expression);
+        }
+    }
+
+    private StarlarkValue EvaluateComparison(ComparisonExpression comparison, StarlarkEnvironment environment)
+    {
+        if (comparison.Operators.Count + 1 != comparison.Operands.Count)
+        {
+            RuntimeErrors.Throw("Invalid comparison chain.", comparison.Span);
+        }
+
+        var left = Evaluate(comparison.Operands[0], environment);
+        for (var i = 0; i < comparison.Operators.Count; i++)
+        {
+            var right = Evaluate(comparison.Operands[i + 1], environment);
+            if (!EvaluateComparisonOperator(comparison.Operators[i], left, right))
+            {
+                return new StarlarkBool(false);
+            }
+
+            left = right;
+        }
+
+        return new StarlarkBool(true);
+    }
+
+    private bool EvaluateComparisonOperator(BinaryOperator op, StarlarkValue leftValue, StarlarkValue rightValue)
+    {
+        return op switch
+        {
+            BinaryOperator.Equal => AreEqual(leftValue, rightValue),
+            BinaryOperator.NotEqual => !AreEqual(leftValue, rightValue),
+            BinaryOperator.In => IsIn(leftValue, rightValue),
+            BinaryOperator.NotIn => !IsIn(leftValue, rightValue),
+            BinaryOperator.Less => CompareRelational(leftValue, rightValue, RelationalOperator.Less),
+            BinaryOperator.LessEqual => CompareRelational(leftValue, rightValue, RelationalOperator.LessEqual),
+            BinaryOperator.Greater => CompareRelational(leftValue, rightValue, RelationalOperator.Greater),
+            BinaryOperator.GreaterEqual => CompareRelational(leftValue, rightValue, RelationalOperator.GreaterEqual),
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
         };
     }
 

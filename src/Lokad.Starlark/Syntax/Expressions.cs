@@ -12,6 +12,10 @@ public sealed record IdentifierExpression(string Name, SourceSpan Span) : Expres
 public sealed record UnaryExpression(UnaryOperator Operator, Expression Operand, SourceSpan Span) : Expression(Span);
 
 public sealed record BinaryExpression(Expression Left, BinaryOperator Operator, Expression Right, SourceSpan Span) : Expression(Span);
+public sealed record ComparisonExpression(
+    IReadOnlyList<Expression> Operands,
+    IReadOnlyList<BinaryOperator> Operators,
+    SourceSpan Span) : Expression(Span);
 
 public sealed record CallExpression(Expression Callee, IReadOnlyList<CallArgument> Arguments, SourceSpan Span) : Expression(Span);
 
@@ -142,5 +146,11 @@ public static class BinaryOperatorExtensions
             BinaryOperator.Or => 0,
             _ => 0
         };
+    }
+
+    public static bool IsComparison(this BinaryOperator op)
+    {
+        return op is BinaryOperator.Equal or BinaryOperator.NotEqual or BinaryOperator.In or BinaryOperator.NotIn
+            or BinaryOperator.Less or BinaryOperator.LessEqual or BinaryOperator.Greater or BinaryOperator.GreaterEqual;
     }
 }

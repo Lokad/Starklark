@@ -207,6 +207,23 @@ public sealed class ExpressionParsingTests
     }
 
     [Fact]
+    public void ParsesComparisonChain()
+    {
+        var expr = StarlarkParser.ParseExpression("1 < 2 < 3");
+
+        var chain = Assert.IsType<ComparisonExpression>(SyntaxNormalization.Normalize(expr));
+        Assert.Collection(
+            chain.Operands,
+            item => Assert.Equal(Lit(1L), item),
+            item => Assert.Equal(Lit(2L), item),
+            item => Assert.Equal(Lit(3L), item));
+        Assert.Collection(
+            chain.Operators,
+            op => Assert.Equal(BinaryOperator.Less, op),
+            op => Assert.Equal(BinaryOperator.Less, op));
+    }
+
+    [Fact]
     public void ParsesNotInExpression()
     {
         var expr = StarlarkParser.ParseExpression("1 not in [2]");

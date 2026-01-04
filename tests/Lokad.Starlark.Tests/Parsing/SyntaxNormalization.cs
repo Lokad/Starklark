@@ -23,6 +23,10 @@ internal static class SyntaxNormalization
                 binary.Operator,
                 Normalize(binary.Right),
                 default),
+            ComparisonExpression comparison => new ComparisonExpression(
+                comparison.Operands.Select(Normalize).ToArray(),
+                comparison.Operators.ToArray(),
+                default),
             CallExpression call => new CallExpression(
                 Normalize(call.Callee),
                 call.Arguments.Select(Normalize).ToArray(),

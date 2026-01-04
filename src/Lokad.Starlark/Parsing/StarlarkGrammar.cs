@@ -508,6 +508,14 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         [NT(1)] Expression left,
         [L(Min = 1)] InfixRight[] right)
     {
+        if (right.Length == 1 && right[0].Operator.IsComparison())
+        {
+            if (TryExtendComparisonChain(left, right[0], out var chain))
+            {
+                return chain;
+            }
+        }
+
         if (right.Length == 1)
         {
             return new BinaryExpression(
@@ -520,6 +528,36 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         var length = right.Length;
         for (var priority = BinaryOperatorExtensions.MaxPriority; length > 0; --priority)
         {
+            if (priority == 2 && length > 1)
+            {
+                var allComparisons = true;
+                for (var i = 0; i < length; i++)
+                {
+                    if (!right[i].Operator.IsComparison())
+                    {
+                        allComparisons = false;
+                        break;
+                    }
+                }
+
+                if (allComparisons)
+                {
+                    var operands = new Expression[length + 1];
+                    var operators = new BinaryOperator[length];
+                    operands[0] = left;
+                    for (var i = 0; i < length; i++)
+                    {
+                        operators[i] = right[i].Operator;
+                        operands[i + 1] = right[i].Right;
+                    }
+
+                    return new ComparisonExpression(
+                        operands,
+                        operators,
+                        SpanBetween(left.Span, right[length - 1].Right.Span));
+                }
+            }
+
             var j = 0;
             for (var i = 0; i < length; ++i, ++j)
             {
@@ -553,6 +591,59 @@ public abstract class StarlarkGrammar<TSelf, TResult> : GrammarParser<TSelf, Tok
         }
 
         return left;
+    }
+
+    private static bool TryExtendComparisonChain(
+        Expression left,
+        InfixRight next,
+        out ComparisonExpression chain)
+    {
+        if (left is ComparisonExpression comparison)
+        {
+            var operands = comparison.Operands.ToList();
+            var operators = comparison.Operators.ToList();
+            operators.Add(next.Operator);
+            operands.Add(next.Right);
+            chain = new ComparisonExpression(
+                operands,
+                operators,
+                SpanBetween(comparison.Span, next.Right.Span));
+            return true;
+        }
+
+        if (left is BinaryExpression binary && binary.Operator.IsComparison())
+        {
+            var operands = new List<Expression>();
+            var operators = new List<BinaryOperator>();
+            BuildComparisonChain(binary, operands, operators);
+            operators.Add(next.Operator);
+            operands.Add(next.Right);
+            chain = new ComparisonExpression(
+                operands,
+                operators,
+                SpanBetween(binary.Span, next.Right.Span));
+            return true;
+        }
+
+        chain = null!;
+        return false;
+    }
+
+    private static void BuildComparisonChain(
+        Expression expression,
+        List<Expression> operands,
+        List<BinaryOperator> operators)
+    {
+        if (expression is BinaryExpression binary && binary.Operator.IsComparison())
+        {
+            BuildComparisonChain(binary.Left, operands, operators);
+            operators.Add(binary.Operator);
+            operands.Add(binary.Right);
+        }
+        else
+        {
+            operands.Add(expression);
+        }
     }
 
     public struct AndRight
