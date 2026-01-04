@@ -32,10 +32,6 @@ interpreter.ExecuteModule(
 
 Conformance scripts live under `tests/Lokad.Starlark.Tests/TestData/Conformance`, split into `go`, `java`, and `rust` subsets. Each file contains multiple cases separated by `---`, and error expectations are annotated with `### (regex)` on the failing statement.
 
-## Conformance Status
-
-The versioned conformance subsets (`tests/Lokad.Starlark.Tests/TestData/Conformance/{go,java,rust}`) are currently green. This status reflects the curated, orthogonal subset we maintain in this repo.
-
 Run the full suite with:
 
 ```powershell
