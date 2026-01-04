@@ -17,9 +17,9 @@ dotnet test    --tl:off --nologo -v minimal --no-build
 - Before every commit, review whether `AGENTS.md` needs updates for new workflows or constraints.
 - After every complex commit, review the full diff and the commit content to confirm there are no accidental or irrelevant changes.
 
-## Parsing changes
+## Impacting changes
 
-- When touching parsing logic, add unit tests that cover the new grammar or behavior.
+- When touching parsing or runtime logic, add unit tests that cover the new grammar or behavior.
 
 ## ExecPlans
 
